@@ -5,30 +5,31 @@ This document breaks down the implementation of the AI Agent Orchestrator (based
 ## Common criteria
 - write RSpec tests for each service, model
 - write RSpec feature smoke tests for each page (the page loads, has expected text, shows data, etc.)
+- if you must deviate from the specification, update the spec-orchestrator.md document (include justification for the deviation)
 
 ## Milestone 1: Core Setup & Data Models
 
 Goal: Establish the application, database, and all core models. No UI or logic yet.
 
-- [ ] Task 1.2: User Model & Devise Setup
+- [x] Task 1.2: User Model & Devise Setup
   * Description: Install Devise and create the User model.
   * AC: db:migrate runs. User model exists. Basic Devise routes are active.
 - [ ] Task 1.3: Credential Model
   * Description: Create the Credential model migration and class. Configure ActiveRecord::Encryption for the api\_key field.
   * AC: Migration for credentials table (with user:references, service\_name, name, api\_key) runs. Credential.new(api\_key: "test").api\_key returns "test", but the value in the DB is encrypted.
-- [ ] Task 1.4: Repository Model
+- [x] Task 1.4: Repository Model
   * Description: Create the Repository model and migration, including the foreign key for github\_credential.
   * AC: Migration for repositories table (with user:references, name, github\_url, github\_credential\_id:references) runs. Model associations (belongs\_to :user, belongs\_to :github\_credential) are defined.
 - [ ] Task 1.5: Epic Model
   * Description: Create the Epic model and migration. Add enums for status.
   * AC: Migration for epics table (with user:references, repository:references, status, base\_branch, etc.) runs. Epic.new.status defaults to pending.
-- [ ] Task 1.6: Task Model
+- [x] Task 1.6: Task Model
   * Description: Create the Task model and migration. Add enums for status and position for ordering.
   * AC: Migration for tasks table (with epic:references, status, position, cursor\_agent\_id, pr\_url, debug\_log:text) runs. belongs\_to :epic association exists.
-- [ ] Task 1.7: NotificationChannel Model
+- [x] Task 1.7: NotificationChannel Model
   * Description: Create the NotificationChannel model and migration.
   * AC: Migration for notification\_channels (with user:references, service\_name, channel\_id) runs.
-- [ ] Task 1.8: AVO Admin Setup (Optional but recommended)
+- [x] Task 1.8: AVO Admin Setup (Optional but recommended)
   * Description: Install AVO and create basic resources for all new models.
   * AC: Admin can log in at /avo. Can view and manually create/edit Users, Repositories, and Credentials.
 
