@@ -1,0 +1,15 @@
+{
+  "repository": "git@github.com:landovsky/orchestra-ai.git",
+  "ref": "epic/manual-epic-creation",
+  "iterations": [
+    {
+      "text": "Task 4.1: Epics::CreateFromManualSpec Interaction - Create working interaction class to create Epic with tasks from console. Test with tasks array and verify task positions. Reference: @spec-orchestrator.md"
+    },
+    {
+      "text": "Task 4.2: Tasks::UpdateStatus Interaction - Create status update interaction with logging and broadcasting. Test task status updates and debug log appending. Reference: @spec-orchestrator.md"
+    },
+    {
+      "text": "Task 4.3: Epics::Start Interaction - Create interaction to start epic manually from console. Test epic status changes and first task job enqueuing. Reference: @spec-orchestrator.md"
+    }
+  ]
+}
