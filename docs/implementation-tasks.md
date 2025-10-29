@@ -23,13 +23,13 @@ Goal: Establish the application, database, and all core models. No UI or logic y
 - [ ] Task 1.5: Epic Model
   * Description: Create the Epic model and migration. Add enums for status.
   * AC: Migration for epics table (with user:references, repository:references, status, base\_branch, etc.) runs. Epic.new.status defaults to pending.
-- [ ] Task 1.6: Task Model
+- [x] Task 1.6: Task Model
   * Description: Create the Task model and migration. Add enums for status and position for ordering.
   * AC: Migration for tasks table (with epic:references, status, position, cursor\_agent\_id, pr\_url, debug\_log:text) runs. belongs\_to :epic association exists.
-- [ ] Task 1.7: NotificationChannel Model
+- [x] Task 1.7: NotificationChannel Model
   * Description: Create the NotificationChannel model and migration.
   * AC: Migration for notification\_channels (with user:references, service\_name, channel\_id) runs.
-- [ ] Task 1.8: AVO Admin Setup (Optional but recommended)
+- [x] Task 1.8: AVO Admin Setup (Optional but recommended)
   * Description: Install AVO and create basic resources for all new models.
   * AC: Admin can log in at /avo. Can view and manually create/edit Users, Repositories, and Credentials.
 
