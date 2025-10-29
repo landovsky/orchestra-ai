@@ -5,4 +5,6 @@ class User < ApplicationRecord
          :recoverable, :rememberable, :validatable
 
   has_many :credentials, dependent: :destroy
+  has_many :repositories, dependent: :destroy
+  has_many :epics, dependent: :destroy
 end
