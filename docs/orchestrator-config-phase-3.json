@@ -1,7 +1,10 @@
 {
-  "repository": "git@github.com:landovsky/orchestrator.git",
-  "ref": "epic/models",
+  "repository": "git@github.com:landovsky/orchestra-ai.git",
+  "ref": "epic/console-first-integration-testing",
   "iterations": [
+    {
+      "text": "Fix github unit tests according to docs/project/github-test-suite-approach.MD"
+    },
     {
       "text": "Task 3.1: GitHub Service Console Validation - Create console script to test GitHub API integration with real credentials. Test infer_base_branch method. Reference: @spec-orchestrator.md"
     },

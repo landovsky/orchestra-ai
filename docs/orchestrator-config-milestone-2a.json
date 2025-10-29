@@ -3,7 +3,7 @@
   "ref": "epic/core-service-wrappers",
   "iterations": [
     {
-      "text": "Fix github unit tests according to docs/project/github-test-suite-approach.md"
+      "text": "Fix github unit tests according to docs/project/github-test-suite-approach.MD"
     },
     {
       "text": "Implement github integration tests according to docs/project/github-integration-tests-approach.md."
