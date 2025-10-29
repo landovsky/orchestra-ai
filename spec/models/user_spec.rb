@@ -1,6 +1,13 @@
 require 'rails_helper'
 
 RSpec.describe User, type: :model do
+  describe 'associations' do
+    it { is_expected.to have_many(:credentials).dependent(:destroy) }
+    it { is_expected.to have_many(:repositories).dependent(:destroy) }
+    it { is_expected.to have_many(:epics).dependent(:destroy) }
+    it { is_expected.to have_many(:notification_channels).dependent(:destroy) }
+  end
+
   describe 'validations' do
     it 'has a valid factory' do
       expect(build(:user)).to be_valid
