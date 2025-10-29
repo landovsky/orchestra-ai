@@ -1,0 +1,6 @@
+# VCR Cassettes Directory
+#
+# This directory stores recorded HTTP interactions for VCR tests.
+# Cassettes are automatically created when tests run with VCR enabled.
+#
+# DO NOT manually edit cassette files.
