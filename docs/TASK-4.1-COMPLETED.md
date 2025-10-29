@@ -84,6 +84,12 @@ Tests:
 ### Basic Usage
 ```ruby
 # Create an epic with tasks
+current_user = User.first
+github_credential = current_user.credentials.github.first
+repo = Repository.find_or_create_by(github_credential: github_credential,
+                                    github_url: 'https://github.com/landovsky/orchestra-ai',
+                                    name: 'Orchestra.ai',
+                                    user: current_user)
 outcome = Epics::CreateFromManualSpec.run(
   user: current_user,
   repository: repo,
@@ -98,7 +104,7 @@ outcome = Epics::CreateFromManualSpec.run(
 if outcome.valid?
   epic = outcome.result[:epic]
   tasks = outcome.result[:tasks]
-  
+
   puts "Created Epic ##{epic.id}: #{epic.title}"
   tasks.each do |task|
     puts "  [#{task.position}] #{task.description}"
@@ -243,7 +249,7 @@ class EpicsController < ApplicationController
       base_branch: params[:base_branch] || 'main',
       cursor_agent_credential_id: params[:cursor_agent_credential_id]
     )
-    
+
     if outcome.valid?
       redirect_to epic_path(outcome.result[:epic])
     else
@@ -255,13 +261,13 @@ end
 
 ## Summary
 
-✅ Created working `Epics::CreateFromManualSpec` interaction class  
-✅ Implemented proper task position assignment (0, 1, 2, ...)  
-✅ Added comprehensive validations for inputs  
-✅ Created extensive test suite with 19 test cases  
-✅ Verified task ordering through database queries  
-✅ Added transaction support for atomicity  
-✅ Created manual test script for verification  
-✅ Documented usage and integration examples  
+✅ Created working `Epics::CreateFromManualSpec` interaction class
+✅ Implemented proper task position assignment (0, 1, 2, ...)
+✅ Added comprehensive validations for inputs
+✅ Created extensive test suite with 19 test cases
+✅ Verified task ordering through database queries
+✅ Added transaction support for atomicity
+✅ Created manual test script for verification
+✅ Documented usage and integration examples
 
 Task 4.1 is complete and ready for use.
