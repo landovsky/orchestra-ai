@@ -1,0 +1,27 @@
+{
+  "repository": "git@github.com:landovsky/orchestrator.git",
+  "ref": "epic/models",
+  "iterations": [
+    {
+      "text": "Task 2.1: GithubService Wrapper - Create lib/services/github_service.rb. Implement initialize(credential) that sets up an Octokit::Client. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.2: GithubService#merge_pull_request(task) - Implement the method to find a PR by task.branch_name and merge it. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.3: GithubService#delete_branch(task) - Implement the method to delete the remote Git branch after a successful merge. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.4: GithubService#infer_base_branch - Implement a method to infer the base branch for a given repository. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.5: CursorAgentService Wrapper - Create lib/services/cursor_agent_service.rb. Implement initialize(credential) and launch_agent methods. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.6: LlmService Adapter - Create lib/services/llm_service.rb. Implement initialize(credential) and generate_spec methods. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 2.7: Telegram::SendMessageJob - Create a basic Sidekiq job to send a message via the Telegram Bot API. Reference: @implementation-tasks.md"
+    }
+  ]
+}
