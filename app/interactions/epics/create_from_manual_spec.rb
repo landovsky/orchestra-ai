@@ -72,7 +72,7 @@ module Epics
 
     def validate_cursor_agent_credential
       credential = Credential.find_by(id: cursor_agent_credential_id, user: user)
-      
+
       if credential.nil?
         errors.add(:cursor_agent_credential_id, 'must belong to the user')
       elsif credential.service_name != 'cursor_agent'
