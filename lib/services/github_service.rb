@@ -57,6 +57,29 @@ module Services
       raise StandardError, "Pull request has conflicts: #{e.message}"
     end
 
+    # Delete a remote Git branch after a successful merge
+    #
+    # @param task [Task] The task object containing branch_name and epic/repository associations
+    # @return [Boolean] true if the branch was successfully deleted
+    # @raise [ArgumentError] if task is invalid or missing required associations
+    # @raise [StandardError] if branch deletion fails
+    def delete_branch(task)
+      validate_task!(task)
+
+      repo_name = task.epic.repository.name
+      branch_name = task.branch_name
+
+      # Delete the remote branch using the refs API
+      # The ref format for branches is "heads/branch_name"
+      @client.delete_ref(repo_name, "heads/#{branch_name}")
+      
+      true
+    rescue Octokit::NotFound => e
+      raise StandardError, "Branch '#{branch_name}' not found: #{e.message}"
+    rescue Octokit::UnprocessableEntity => e
+      raise StandardError, "Cannot delete branch '#{branch_name}': #{e.message}"
+    end
+
     private
 
     # Validate the task and its associations

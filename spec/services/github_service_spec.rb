@@ -275,4 +275,140 @@ RSpec.describe Services::GithubService do
       end
     end
   end
+
+  describe '#delete_branch' do
+    let(:user) { create(:user) }
+    let(:credential) { create(:credential, user: user, service_name: 'github') }
+    let(:repository) { create(:repository, user: user, github_credential: credential, name: 'owner/repo') }
+    let(:epic) { create(:epic, user: user, repository: repository) }
+    let(:task) { create(:task, epic: epic, branch_name: 'feature-branch', position: 0) }
+    let(:service) { described_class.new(credential) }
+    let(:mock_client) { instance_double(Octokit::Client) }
+
+    before do
+      allow(service).to receive(:client).and_return(mock_client)
+    end
+
+    context 'with a valid task and existing branch' do
+      before do
+        allow(mock_client).to receive(:delete_ref)
+          .with('owner/repo', 'heads/feature-branch')
+          .and_return(true)
+      end
+
+      it 'successfully deletes the branch and returns true' do
+        result = service.delete_branch(task)
+        
+        expect(result).to be true
+      end
+
+      it 'calls the Octokit client with correct parameters' do
+        service.delete_branch(task)
+        
+        expect(mock_client).to have_received(:delete_ref)
+          .with('owner/repo', 'heads/feature-branch')
+      end
+
+      it 'uses the correct ref format (heads/branch_name)' do
+        service.delete_branch(task)
+        
+        expect(mock_client).to have_received(:delete_ref)
+          .with('owner/repo', 'heads/feature-branch')
+      end
+    end
+
+    context 'when branch is not found' do
+      before do
+        allow(mock_client).to receive(:delete_ref)
+          .with('owner/repo', 'heads/feature-branch')
+          .and_raise(Octokit::NotFound.new)
+      end
+
+      it 'raises StandardError with appropriate message' do
+        expect {
+          service.delete_branch(task)
+        }.to raise_error(StandardError, /Branch 'feature-branch' not found/)
+      end
+    end
+
+    context 'when branch cannot be deleted' do
+      before do
+        allow(mock_client).to receive(:delete_ref)
+          .with('owner/repo', 'heads/feature-branch')
+          .and_raise(Octokit::UnprocessableEntity.new)
+      end
+
+      it 'raises StandardError with appropriate message' do
+        expect {
+          service.delete_branch(task)
+        }.to raise_error(StandardError, /Cannot delete branch 'feature-branch'/)
+      end
+    end
+
+    context 'with invalid task parameters' do
+      it 'raises ArgumentError when task is nil' do
+        expect {
+          service.delete_branch(nil)
+        }.to raise_error(ArgumentError, 'Task cannot be nil')
+      end
+
+      it 'raises ArgumentError when task has no branch_name' do
+        task.branch_name = nil
+        
+        expect {
+          service.delete_branch(task)
+        }.to raise_error(ArgumentError, 'Task must have a branch_name')
+      end
+
+      it 'raises ArgumentError when task has blank branch_name' do
+        task.branch_name = ''
+        
+        expect {
+          service.delete_branch(task)
+        }.to raise_error(ArgumentError, 'Task must have a branch_name')
+      end
+
+      it 'raises ArgumentError when task has no epic' do
+        task_without_epic = build(:task, epic: nil, position: 0)
+        
+        expect {
+          service.delete_branch(task_without_epic)
+        }.to raise_error(ArgumentError, 'Task must belong to an epic')
+      end
+
+      it 'raises ArgumentError when epic has no repository' do
+        epic_without_repo = build(:epic, user: user, repository: nil)
+        task_with_invalid_epic = build(:task, epic: epic_without_repo, position: 0)
+        
+        expect {
+          service.delete_branch(task_with_invalid_epic)
+        }.to raise_error(ArgumentError, 'Epic must have a repository')
+      end
+
+      it 'raises ArgumentError when repository has blank name' do
+        repository.name = ''
+        
+        expect {
+          service.delete_branch(task)
+        }.to raise_error(ArgumentError, 'Repository must have a name')
+      end
+    end
+
+    context 'with branch names containing special characters' do
+      before do
+        task.branch_name = 'feature/add-new-thing'
+        allow(mock_client).to receive(:delete_ref)
+          .with('owner/repo', 'heads/feature/add-new-thing')
+          .and_return(true)
+      end
+
+      it 'correctly handles branch names with slashes' do
+        result = service.delete_branch(task)
+        
+        expect(result).to be true
+        expect(mock_client).to have_received(:delete_ref)
+          .with('owner/repo', 'heads/feature/add-new-thing')
+      end
+    end
+  end
 end
