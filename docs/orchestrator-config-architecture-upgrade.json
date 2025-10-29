@@ -1,0 +1,12 @@
+{
+  "repository": "git@github.com:landovsky/orchestra-ai.git",
+  "ref": "epic/architecture-upgrade",
+  "iterations": [
+    {
+      "text": "🔴 CRITICAL: Add Webhook Signature Verification - Implement HMAC signature verification using CURSOR_WEBHOOK_SECRET to prevent malicious webhook manipulation. Reference: @architecture-recommendations.md"
+    },
+    {
+      "text": "🔴 CRITICAL: Enforce Job Idempotency - Add checks to prevent duplicate agent launches by verifying task status before executing Tasks::ExecuteJob. Reference: @architecture-recommendations.md"
+    }
+  ]
+}
