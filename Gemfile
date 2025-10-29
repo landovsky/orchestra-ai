@@ -78,6 +78,7 @@ gem 'googleauth'
 # gem 'google-cloud-vision'
 gem 'httparty'
 gem 'mailjet'
+gem 'octokit', '~> 9.0'
 gem 'posthog-ruby'
 gem 'ruby-openai', '~> 7', '>= 7.3'
 
