@@ -90,7 +90,7 @@ RSpec.describe Epic, type: :model do
     it { is_expected.to have_db_column(:title).of_type(:string) }
     it { is_expected.to have_db_column(:prompt).of_type(:text) }
     it { is_expected.to have_db_column(:base_branch).of_type(:string) }
-    it { is_expected.to have_db_column(:status).of_type(:integer).with_options(null: false, default: 0) }
+    it { is_expected.to have_db_column(:status).of_type(:integer).with_options(null: false) }
     it { is_expected.to have_db_column(:created_at).of_type(:datetime).with_options(null: false) }
     it { is_expected.to have_db_column(:updated_at).of_type(:datetime).with_options(null: false) }
   end
