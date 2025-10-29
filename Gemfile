@@ -14,7 +14,7 @@ gem 'devise'
 gem 'bootsnap', require: false
 gem 'puma', '~> 6.0'
 gem 'rails', '~> 8.1'
-gem 'route_translator', '~> 14.1', '>= 14.1.1'
+# gem 'route_translator', '~> 14.1', '>= 14.1.1' # TODO: Temporarily disabled due to Rails 8.1 incompatibility
 
 ## Front-end and Asset Pipeline
 gem 'avo'
@@ -91,6 +91,7 @@ group :development, :test do
   gem 'ffaker'
   gem 'pry-rails'
   gem 'rspec-rails'
+  gem 'shoulda-matchers', '~> 6.0'
   # gem 'rswag-specs'
 end
 
