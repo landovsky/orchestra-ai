@@ -16,7 +16,7 @@ RSpec.describe Task, type: :model do
     it { should define_enum_for(:status).with_values(pending: 0, running: 1, pr_open: 2, merging: 3, completed: 4, failed: 5).backed_by_column_of_type(:integer) }
 
     it 'defaults to pending status' do
-      task = build(:task, status: nil)
+      task = build(:task)
       expect(task.status).to eq('pending')
     end
   end
