@@ -117,7 +117,9 @@ For comprehensive testing with multiple test cases:
 # GitHub Service (Task 3.1)
 rails runner script/test_github_service.rb
 
+# Cursor Service (Task 3.2)
+rails runner script/test_cursor_service.rb
+
 # Coming soon:
-# rails runner script/test_cursor_service.rb
 # rails runner script/test_llm_service.rb
 ```
