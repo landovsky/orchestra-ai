@@ -7,4 +7,5 @@ class User < ApplicationRecord
   has_many :credentials, dependent: :destroy
   has_many :repositories, dependent: :destroy
   has_many :epics, dependent: :destroy
+  has_many :notification_channels, dependent: :destroy
 end
