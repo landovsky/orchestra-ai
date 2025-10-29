@@ -1,6 +1,6 @@
 module Tasks
   class UpdateStatus < ActiveInteraction::Base
-    object :task, class: Task
+    record :task
     string :new_status
     string :log_message, default: nil
     string :pr_url, default: nil

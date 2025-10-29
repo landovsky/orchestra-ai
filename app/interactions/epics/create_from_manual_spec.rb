@@ -1,7 +1,7 @@
 module Epics
   class CreateFromManualSpec < ActiveInteraction::Base
-    object :user, class: User
-    object :repository, class: Repository
+    record :user
+    record :repository
     string :tasks_json
     string :base_branch, default: 'main'
     integer :cursor_agent_credential_id, default: nil
