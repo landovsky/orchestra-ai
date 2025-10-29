@@ -1,6 +1,6 @@
 {
   "repository": "git@github.com:landovsky/orchestra-ai.git",
-  "ref": "epic/models",
+  "ref": "epic/core-service-wrappers",
   "iterations": [
     {
       "text": "Task 2.1: GithubService Wrapper - Create lib/services/github_service.rb. Implement initialize(credential) that sets up an Octokit::Client. Reference: @implementation-tasks.md"
