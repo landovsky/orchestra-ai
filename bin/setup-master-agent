@@ -233,11 +233,11 @@ if [ -d "$WORKSPACE_DIR" ]; then
     fi
 fi
 
-echo -e "${CYAN}The workspace will be created automatically when you run master-agent.sh${NC}"
+echo -e "${CYAN}The workspace will be created automatically when you run master-agent${NC}"
 echo -e "${YELLOW}Note: Set WORKSPACE_DIR environment variable to use a different location${NC}"
 
 # Make script executable
-chmod +x master-agent.sh
+chmod +x master-agent
 
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -250,13 +250,13 @@ echo -e "  ${YELLOW}1.${NC} Edit your configuration:"
 echo -e "     ${CYAN}nano master-agent-config.json${NC}"
 echo ""
 echo -e "  ${YELLOW}2.${NC} Run the Master Agent:"
-echo -e "     ${CYAN}./master-agent.sh master-agent-config.json${NC}"
+echo -e "     ${CYAN}./master-agent master-agent-config.json${NC}"
 echo ""
 echo -e "  ${YELLOW}3.${NC} Or with custom update interval (in seconds):"
-echo -e "     ${CYAN}./master-agent.sh master-agent-config.json 15${NC}"
+echo -e "     ${CYAN}./master-agent master-agent-config.json 15${NC}"
 echo ""
 echo -e "  ${YELLOW}4.${NC} Enable debug mode for verbose logging:"
-echo -e "     ${CYAN}DEBUG=true ./master-agent.sh master-agent-config.json${NC}"
+echo -e "     ${CYAN}DEBUG=true ./master-agent master-agent-config.json${NC}"
 echo ""
 echo -e "${BOLD}How it works:${NC}"
 echo -e "  • Each agent works on the ${CYAN}$CURRENT_BRANCH${NC} branch"
