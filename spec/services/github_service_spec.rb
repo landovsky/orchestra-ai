@@ -6,6 +6,15 @@ RSpec.describe Services::GithubService do
   describe '#initialize' do
     let(:user) { create(:user) }
     let(:credential) { create(:credential, user: user, service_name: 'github') }
+    let(:mock_client) { instance_double(Octokit::Client) }
+
+    before do
+      # Stub Octokit::Client.new to prevent real HTTP calls
+      allow(Octokit::Client).to receive(:new).and_return(mock_client)
+      allow(mock_client).to receive(:auto_paginate=)
+      allow(mock_client).to receive(:auto_paginate).and_return(true)
+      allow(mock_client).to receive(:access_token).and_return(credential.api_key)
+    end
 
     context 'with a valid credential' do
       it 'successfully initializes the service' do
@@ -13,7 +22,7 @@ RSpec.describe Services::GithubService do
         
         expect(service).to be_a(Services::GithubService)
         expect(service.credential).to eq(credential)
-        expect(service.client).to be_a(Octokit::Client)
+        expect(service.client).to eq(mock_client)
       end
 
       it 'configures the Octokit client with the correct access token' do
@@ -60,11 +69,13 @@ RSpec.describe Services::GithubService do
     let(:repository) { create(:repository, user: user, github_credential: credential, name: 'owner/repo') }
     let(:epic) { create(:epic, user: user, repository: repository) }
     let(:task) { create(:task, epic: epic, branch_name: 'feature-branch', position: 0) }
-    let(:service) { described_class.new(credential) }
     let(:mock_client) { instance_double(Octokit::Client) }
+    let(:service) { described_class.new(credential) }
 
     before do
-      allow(service).to receive(:client).and_return(mock_client)
+      # Stub Octokit::Client.new to prevent real HTTP calls during initialization
+      allow(Octokit::Client).to receive(:new).and_return(mock_client)
+      allow(mock_client).to receive(:auto_paginate=)
     end
 
     context 'with a valid task and mergeable PR' do
@@ -236,7 +247,7 @@ RSpec.describe Services::GithubService do
       end
 
       it 'raises ArgumentError when task has no epic' do
-        task_without_epic = build(:task, epic: nil, position: 0)
+        task_without_epic = build(:task, epic: nil, branch_name: 'feature-branch', position: 0)
         
         expect {
           service.merge_pull_request(task_without_epic)
@@ -245,7 +256,7 @@ RSpec.describe Services::GithubService do
 
       it 'raises ArgumentError when epic has no repository' do
         epic_without_repo = build(:epic, user: user, repository: nil)
-        task_with_invalid_epic = build(:task, epic: epic_without_repo, position: 0)
+        task_with_invalid_epic = build(:task, epic: epic_without_repo, branch_name: 'feature-branch', position: 0)
         
         expect {
           service.merge_pull_request(task_with_invalid_epic)
@@ -282,11 +293,13 @@ RSpec.describe Services::GithubService do
     let(:repository) { create(:repository, user: user, github_credential: credential, name: 'owner/repo') }
     let(:epic) { create(:epic, user: user, repository: repository) }
     let(:task) { create(:task, epic: epic, branch_name: 'feature-branch', position: 0) }
-    let(:service) { described_class.new(credential) }
     let(:mock_client) { instance_double(Octokit::Client) }
+    let(:service) { described_class.new(credential) }
 
     before do
-      allow(service).to receive(:client).and_return(mock_client)
+      # Stub Octokit::Client.new to prevent real HTTP calls during initialization
+      allow(Octokit::Client).to receive(:new).and_return(mock_client)
+      allow(mock_client).to receive(:auto_paginate=)
     end
 
     context 'with a valid task and existing branch' do
@@ -369,7 +382,7 @@ RSpec.describe Services::GithubService do
       end
 
       it 'raises ArgumentError when task has no epic' do
-        task_without_epic = build(:task, epic: nil, position: 0)
+        task_without_epic = build(:task, epic: nil, branch_name: 'feature-branch', position: 0)
         
         expect {
           service.delete_branch(task_without_epic)
@@ -378,7 +391,7 @@ RSpec.describe Services::GithubService do
 
       it 'raises ArgumentError when epic has no repository' do
         epic_without_repo = build(:epic, user: user, repository: nil)
-        task_with_invalid_epic = build(:task, epic: epic_without_repo, position: 0)
+        task_with_invalid_epic = build(:task, epic: epic_without_repo, branch_name: 'feature-branch', position: 0)
         
         expect {
           service.delete_branch(task_with_invalid_epic)
@@ -415,12 +428,14 @@ RSpec.describe Services::GithubService do
   describe '#infer_base_branch' do
     let(:user) { create(:user) }
     let(:credential) { create(:credential, user: user, service_name: 'github') }
-    let(:service) { described_class.new(credential) }
     let(:mock_client) { instance_double(Octokit::Client) }
+    let(:service) { described_class.new(credential) }
     let(:repo_name) { 'owner/repo' }
 
     before do
-      allow(service).to receive(:client).and_return(mock_client)
+      # Stub Octokit::Client.new to prevent real HTTP calls during initialization
+      allow(Octokit::Client).to receive(:new).and_return(mock_client)
+      allow(mock_client).to receive(:auto_paginate=)
     end
 
     context 'with a valid repository name' do
