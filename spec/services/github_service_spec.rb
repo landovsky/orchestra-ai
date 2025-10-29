@@ -411,4 +411,164 @@ RSpec.describe Services::GithubService do
       end
     end
   end
+
+  describe '#infer_base_branch' do
+    let(:user) { create(:user) }
+    let(:credential) { create(:credential, user: user, service_name: 'github') }
+    let(:service) { described_class.new(credential) }
+    let(:mock_client) { instance_double(Octokit::Client) }
+    let(:repo_name) { 'owner/repo' }
+
+    before do
+      allow(service).to receive(:client).and_return(mock_client)
+    end
+
+    context 'with a valid repository name' do
+      let(:mock_repo) do
+        double('Repository', default_branch: 'main')
+      end
+
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_return(mock_repo)
+      end
+
+      it 'successfully returns the default branch name' do
+        result = service.infer_base_branch(repo_name)
+        
+        expect(result).to eq('main')
+      end
+
+      it 'calls the Octokit client with correct parameters' do
+        service.infer_base_branch(repo_name)
+        
+        expect(mock_client).to have_received(:repository).with(repo_name)
+      end
+    end
+
+    context 'when repository uses master as default branch' do
+      let(:mock_repo) do
+        double('Repository', default_branch: 'master')
+      end
+
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_return(mock_repo)
+      end
+
+      it 'correctly returns master' do
+        result = service.infer_base_branch(repo_name)
+        
+        expect(result).to eq('master')
+      end
+    end
+
+    context 'when repository uses a custom default branch' do
+      let(:mock_repo) do
+        double('Repository', default_branch: 'develop')
+      end
+
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_return(mock_repo)
+      end
+
+      it 'correctly returns the custom branch name' do
+        result = service.infer_base_branch(repo_name)
+        
+        expect(result).to eq('develop')
+      end
+    end
+
+    context 'when repository is not found' do
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_raise(Octokit::NotFound.new)
+      end
+
+      it 'raises StandardError with appropriate message' do
+        expect {
+          service.infer_base_branch(repo_name)
+        }.to raise_error(StandardError, /Repository 'owner\/repo' not found/)
+      end
+    end
+
+    context 'when authentication fails' do
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_raise(Octokit::Unauthorized.new)
+      end
+
+      it 'raises StandardError with appropriate message' do
+        expect {
+          service.infer_base_branch(repo_name)
+        }.to raise_error(StandardError, /Authentication failed/)
+      end
+    end
+
+    context 'when access is forbidden' do
+      before do
+        allow(mock_client).to receive(:repository)
+          .with(repo_name)
+          .and_raise(Octokit::Forbidden.new)
+      end
+
+      it 'raises StandardError with appropriate message' do
+        expect {
+          service.infer_base_branch(repo_name)
+        }.to raise_error(StandardError, /Access forbidden to repository 'owner\/repo'/)
+      end
+    end
+
+    context 'with invalid repository name parameters' do
+      it 'raises ArgumentError when repo_name is nil' do
+        expect {
+          service.infer_base_branch(nil)
+        }.to raise_error(ArgumentError, 'Repository name cannot be nil or blank')
+      end
+
+      it 'raises ArgumentError when repo_name is blank string' do
+        expect {
+          service.infer_base_branch('')
+        }.to raise_error(ArgumentError, 'Repository name cannot be nil or blank')
+      end
+
+      it 'raises ArgumentError when repo_name is whitespace only' do
+        expect {
+          service.infer_base_branch('   ')
+        }.to raise_error(ArgumentError, 'Repository name cannot be nil or blank')
+      end
+    end
+
+    context 'with different repository name formats' do
+      let(:mock_repo) do
+        double('Repository', default_branch: 'main')
+      end
+
+      it 'handles organization repositories' do
+        allow(mock_client).to receive(:repository)
+          .with('organization/repo-name')
+          .and_return(mock_repo)
+
+        result = service.infer_base_branch('organization/repo-name')
+        
+        expect(result).to eq('main')
+      end
+
+      it 'handles repositories with hyphens and underscores' do
+        allow(mock_client).to receive(:repository)
+          .with('user/my-awesome_repo')
+          .and_return(mock_repo)
+
+        result = service.infer_base_branch('user/my-awesome_repo')
+        
+        expect(result).to eq('main')
+      end
+    end
+  end
 end

@@ -80,6 +80,31 @@ module Services
       raise StandardError, "Cannot delete branch '#{branch_name}': #{e.message}"
     end
 
+    # Infer the base branch for a given repository
+    #
+    # This method fetches the repository's default branch (e.g., 'main', 'master')
+    # from GitHub's API.
+    #
+    # @param repo_name [String] The repository name in format 'owner/repo'
+    # @return [String] The default branch name (e.g., 'main')
+    # @raise [ArgumentError] if repo_name is nil or blank
+    # @raise [StandardError] if repository is not found or API request fails
+    def infer_base_branch(repo_name)
+      raise ArgumentError, 'Repository name cannot be nil or blank' if repo_name.blank?
+
+      # Fetch repository information from GitHub
+      repo = @client.repository(repo_name)
+      
+      # Return the default branch name
+      repo.default_branch
+    rescue Octokit::NotFound => e
+      raise StandardError, "Repository '#{repo_name}' not found: #{e.message}"
+    rescue Octokit::Unauthorized => e
+      raise StandardError, "Authentication failed: #{e.message}"
+    rescue Octokit::Forbidden => e
+      raise StandardError, "Access forbidden to repository '#{repo_name}': #{e.message}"
+    end
+
     private
 
     # Validate the task and its associations
