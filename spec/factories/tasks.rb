@@ -1,7 +1,7 @@
 FactoryBot.define do
   factory :task do
     association :epic
-    description { "Implement #{Faker::Hacker.verb} #{Faker::Hacker.noun}" }
+    description { "Implement #{FFaker::Job.title.downcase} for #{FFaker::Company.name}" }
     sequence(:position) { |n| n }
     status { :pending }
     cursor_agent_id { nil }
@@ -40,7 +40,7 @@ FactoryBot.define do
       status { :failed }
       cursor_agent_id { "agent-#{SecureRandom.hex(8)}" }
       branch_name { "cursor/#{description.parameterize}-#{SecureRandom.hex(4)}" }
-      debug_log { "Error: #{Faker::Lorem.sentence}" }
+      debug_log { "Error: #{FFaker::Lorem.sentence}" }
     end
   end
 end
