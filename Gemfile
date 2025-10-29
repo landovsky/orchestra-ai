@@ -107,7 +107,9 @@ end
 group :test do
   gem 'capybara'
   gem 'database_cleaner', '~> 2.0', '>= 2.0.2'
+  gem 'vcr', '~> 6.0'
   gem 'webdrivers'
+  gem 'webmock', '~> 3.0'
 end
 
 ## Miscellaneous
