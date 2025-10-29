@@ -120,6 +120,6 @@ rails runner script/test_github_service.rb
 # Cursor Service (Task 3.2)
 rails runner script/test_cursor_service.rb
 
-# Coming soon:
-# rails runner script/test_llm_service.rb
+# LLM Service (Task 3.3)
+rails runner script/test_llm_service.rb
 ```
