@@ -9,33 +9,33 @@ require 'json'
 require 'uri'
 
 # Configuration
-BASE_URL = ENV.fetch('WEBHOOK_BASE_URL', 'http://localhost:3000')
-TASK_ID = ENV.fetch('TEST_TASK_ID', '1')
+BASE_URL = ENV.fetch('WEBHOOK_BASE_URL', 'http://localhost:3099')
+TASK_ID = ENV.fetch('TEST_TASK_ID', '32')
 
 def send_webhook(task_id, payload)
   uri = URI.parse("#{BASE_URL}/webhooks/cursor/#{task_id}")
-  
+
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = uri.scheme == 'https'
-  
+
   request = Net::HTTP::Post.new(uri.path)
   request['Content-Type'] = 'application/json'
   request.body = payload.to_json
-  
+
   puts "\n" + "=" * 80
   puts "Sending webhook to: #{uri}"
   puts "-" * 80
   puts "Payload:"
   puts JSON.pretty_generate(payload)
   puts "=" * 80
-  
+
   response = http.request(request)
-  
+
   puts "Response Status: #{response.code} #{response.message}"
   puts "Response Body:"
   puts JSON.pretty_generate(JSON.parse(response.body))
   puts "=" * 80
-  
+
   response
 rescue StandardError => e
   puts "Error: #{e.message}"
@@ -104,41 +104,41 @@ def test_invalid_payload(task_id)
 end
 
 # Main execution
-if __FILE__ == $0
+# if __FILE__ == $0
   puts "=" * 80
   puts "Webhook Testing Script"
   puts "=" * 80
   puts "Base URL: #{BASE_URL}"
   puts "Task ID: #{TASK_ID}"
   puts "=" * 80
-  
+
   # Check if task exists
   puts "\nNote: Make sure task #{TASK_ID} exists in the database"
   puts "You can create one in rails console:"
   puts "  user = User.first || User.create!(email: 'test@test.com', password: 'password')"
-  puts "  repo = Repository.create!(name: 'test-repo', github_url: 'https://github.com/test/repo', user: user)"
-  puts "  epic = Epic.create!(title: 'Test Epic', repository: repo, user: user, base_branch: 'main')"
+  puts "  repo = Repository.first"
+  puts "  epic = Epic.first"
   puts "  task = Task.create!(epic: epic, description: 'Test task', position: 1)"
   puts "\nPress Enter to continue or Ctrl+C to abort..."
   gets
-  
+
   # Run tests
   test_running_status(TASK_ID)
   sleep 1
-  
+
   test_finished_status(TASK_ID)
   sleep 1
-  
+
   test_error_status(TASK_ID)
   sleep 1
-  
+
   test_invalid_task
   sleep 1
-  
+
   test_invalid_payload(TASK_ID)
-  
+
   puts "\n" + "=" * 80
   puts "Testing Complete!"
   puts "Check log/development.log for detailed webhook logs"
   puts "=" * 80
-end
+# end
