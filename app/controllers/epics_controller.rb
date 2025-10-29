@@ -33,4 +33,19 @@ class EpicsController < ApplicationController
   def show
     @epic = Epic.find(params[:id])
   end
+
+  def start
+    @epic = Epic.find(params[:id])
+    
+    outcome = Epics::Start.run(
+      user: current_user,
+      epic: @epic
+    )
+
+    if outcome.valid?
+      redirect_to epic_path(@epic), notice: "Epic started successfully! First task is being executed."
+    else
+      redirect_to epic_path(@epic), alert: "Failed to start epic: #{outcome.errors.full_messages.join(', ')}"
+    end
+  end
 end
