@@ -5,7 +5,9 @@
 class WebhooksController < ApplicationController
   # Skip CSRF protection for webhook endpoints
   skip_before_action :verify_authenticity_token
-  skip_before_action :authenticate_user!, if: :devise_configured?
+
+  # FIXME: throws: ArgumentError: Before process_action callback :authenticate_user! has not been defined
+  # skip_before_action :authenticate_user!, if: :devise_configured?
 
   # POST /webhooks/cursor/:task_id
   # Receives status updates from Cursor agent API
@@ -25,7 +27,7 @@ class WebhooksController < ApplicationController
 
     # Extract status from payload
     status = extract_status(params)
-    
+
     if status.nil?
       log_webhook_error("Invalid webhook payload - missing status", params)
       render json: { error: 'Invalid payload' }, status: :bad_request
@@ -106,10 +108,10 @@ class WebhooksController < ApplicationController
   # Transitions task to pr_open and saves PR URL
   def handle_finished_status(task, params)
     Rails.logger.info("[Webhook] Task #{task.id}: Handling FINISHED status")
-    
+
     # Extract PR URL from webhook payload
     pr_url = extract_pr_url(params)
-    
+
     if pr_url.blank?
       Rails.logger.warn("[Webhook] Task #{task.id}: No PR URL found in FINISHED webhook")
     end
@@ -132,7 +134,7 @@ class WebhooksController < ApplicationController
   # Handle RUNNING webhook status
   def handle_running_status(task, params)
     Rails.logger.info("[Webhook] Task #{task.id}: Handling RUNNING status")
-    
+
     # Only update if not already running or beyond
     if task.pending?
       outcome = Tasks::UpdateStatus.run(
@@ -154,10 +156,10 @@ class WebhooksController < ApplicationController
   # Handle ERROR webhook status
   def handle_error_status(task, params)
     Rails.logger.info("[Webhook] Task #{task.id}: Handling ERROR status")
-    
+
     # Extract error message from payload if available
     error_message = extract_error_message(params)
-    
+
     outcome = Tasks::UpdateStatus.run(
       task: task,
       new_status: 'failed',
@@ -177,15 +179,15 @@ class WebhooksController < ApplicationController
     # Try nested target structure (Cursor API format)
     return params.dig(:target, :prUrl) if params.dig(:target, :prUrl).present?
     return params.dig(:target, :pr_url) if params.dig(:target, :pr_url).present?
-    
+
     # Try direct PR URL parameter
     return params[:pr_url] if params[:pr_url].present?
     return params[:prUrl] if params[:prUrl].present?
-    
+
     # Try data structure
     return params.dig(:data, :pr_url) if params.dig(:data, :pr_url).present?
     return params.dig(:data, :prUrl) if params.dig(:data, :prUrl).present?
-    
+
     nil
   end
 
@@ -196,7 +198,7 @@ class WebhooksController < ApplicationController
     return params[:error] if params[:error].present?
     return params.dig(:data, :error) if params.dig(:data, :error).present?
     return params[:message] if params[:message].present?
-    
+
     nil
   end
 end
