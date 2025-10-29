@@ -8,7 +8,7 @@ module Services
   # CursorAgentService wraps the Cursor API for launching AI agents
   # This service handles operations like launching agents with specific tasks and configurations.
   class CursorAgentService
-    CURSOR_API_ENDPOINT = 'https://api.cursor.com/v0/agents'
+    CURSOR_API_ENDPOINT = 'https://api.cursor.com/v0'
     WEBHOOK_SECRET = ENV.fetch('CURSOR_WEBHOOK_SECRET', 'default-webhook-secret')
 
     attr_reader :api_key, :credential
@@ -40,8 +40,13 @@ module Services
       validate_launch_params!(task, webhook_url, branch_name)
 
       payload = build_payload(task, webhook_url, branch_name)
-      response = post_to_cursor_api(payload)
+      response = post_to_cursor_api(payload, '/agents')
 
+      parse_response(response)
+    end
+
+    def list_agents
+      response = get_from_cursor_api('/agents')
       parse_response(response)
     end
 
@@ -78,16 +83,41 @@ module Services
         source: {
           repository: task.epic.repository.github_url,
           ref: task.epic.base_branch
-        },
-        target: {
-          branchName: branch_name,
-          autoCreatePr: true
-        },
-        webhook: {
-          url: webhook_url,
-          secret: WEBHOOK_SECRET
         }
       }
+    end
+
+    def get_from_cursor_api(path)
+      uri = URI.parse(CURSOR_API_ENDPOINT + path)
+      http = Net::HTTP.new(uri.host, uri.port)
+
+      http.use_ssl = true
+      http.open_timeout = 10
+      http.read_timeout = 30
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+      request = Net::HTTP::Get.new(uri.path)
+      request['Authorization'] = "Bearer #{@api_key}"
+      request['Content-Type'] = 'application/json'
+
+      puts "URI: #{uri}"
+      puts "Request: #{request.inspect}"
+      puts "API Key: #{@api_key}"
+      puts "Content Type: #{request['Content-Type']}"
+      puts "Body: #{request.body}"
+      puts "Headers: #{request.to_hash}"
+      puts "HTTP: #{http.inspect}"
+      puts "HTTP Host: #{http.address}"
+      puts "HTTP Port: #{http.port}"
+
+      response = http.request(request)
+
+      unless response.is_a?(Net::HTTPSuccess)
+        error_message = extract_error_message(response)
+        raise StandardError, "Cursor API request failed (#{response.code}): #{error_message}"
+      end
+
+      response
     end
 
     # POST the payload to the Cursor API
@@ -95,12 +125,13 @@ module Services
     # @param payload [Hash] The request payload
     # @return [Net::HTTPResponse] The HTTP response object
     # @raise [StandardError] if the request fails
-    def post_to_cursor_api(payload)
-      uri = URI.parse(CURSOR_API_ENDPOINT)
+    def post_to_cursor_api(payload, path)
+      uri = URI.parse(CURSOR_API_ENDPOINT + path)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
       http.open_timeout = 10
       http.read_timeout = 30
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
       request = Net::HTTP::Post.new(uri.path)
       request['Authorization'] = "Bearer #{@api_key}"
