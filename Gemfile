@@ -41,7 +41,7 @@ gem 'nilify_blanks'
 gem 'pg', '~> 1.1'
 # gem 'pg_query'
 # gem 'pg_search'
-gem 'prosopite', '~> 1.4'
+gem 'prosopite', '~> 2.1'
 # gem "kredis"
 gem 'redis', '~> 5.0'
 # gem 'scenic'
