@@ -5,18 +5,19 @@ This document breaks down the implementation of the AI Agent Orchestrator (based
 ## Common criteria
 - write RSpec tests for each service, model
 - write RSpec feature smoke tests for each page (the page loads, has expected text, shows data, etc.)
+- if you must deviate from the specification, update the spec-orchestrator.md document (include justification for the deviation)
 
 ## Milestone 1: Core Setup & Data Models
 
 Goal: Establish the application, database, and all core models. No UI or logic yet.
 
-- [ ] Task 1.2: User Model & Devise Setup
+- [x] Task 1.2: User Model & Devise Setup
   * Description: Install Devise and create the User model.
   * AC: db:migrate runs. User model exists. Basic Devise routes are active.
 - [ ] Task 1.3: Credential Model
   * Description: Create the Credential model migration and class. Configure ActiveRecord::Encryption for the api\_key field.
   * AC: Migration for credentials table (with user:references, service\_name, name, api\_key) runs. Credential.new(api\_key: "test").api\_key returns "test", but the value in the DB is encrypted.
-- [ ] Task 1.4: Repository Model
+- [x] Task 1.4: Repository Model
   * Description: Create the Repository model and migration, including the foreign key for github\_credential.
   * AC: Migration for repositories table (with user:references, name, github\_url, github\_credential\_id:references) runs. Model associations (belongs\_to :user, belongs\_to :github\_credential) are defined.
 - [ ] Task 1.5: Epic Model
