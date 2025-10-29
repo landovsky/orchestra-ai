@@ -7,8 +7,6 @@ default: &default
 development:
   <<: *default
   database: orchestra_ai_development
-  host: localhost
-  port: 5432
   schema_search_path: public
   min_messages: notice
 
