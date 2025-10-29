@@ -1,6 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe Tasks::UpdateStatus, type: :interaction do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:user) { create(:user) }
   let(:repository) { create(:repository, user: user) }
   let(:epic) { create(:epic, user: user, repository: repository) }
@@ -21,7 +23,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'updates PR URL when provided' do
         pr_url = 'https://github.com/user/repo/pull/123'
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'pr_open',
@@ -34,7 +36,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'appends log message with timestamp' do
         log_message = 'Starting Cursor agent...'
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
@@ -49,7 +51,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'appends to existing log without overwriting' do
         task.update!(debug_log: '[2025-01-01 10:00:00] First message')
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
@@ -65,7 +67,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'handles nil debug_log initially' do
         task.update_column(:debug_log, nil)
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
@@ -166,7 +168,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'does not modify task on validation failure' do
         original_status = task.status
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'invalid_status',
@@ -233,7 +235,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
     context 'log formatting' do
       it 'formats timestamp correctly' do
         freeze_time = Time.zone.parse('2025-10-29 14:30:45')
-        
+
         travel_to freeze_time do
           outcome = described_class.run(
             task: task,
@@ -248,7 +250,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'preserves log message content exactly' do
         special_message = "Special chars: !@#$%^&*() and 'quotes' and \"double quotes\""
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
@@ -261,7 +263,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'handles multiline log messages' do
         multiline_message = "Line 1\nLine 2\nLine 3"
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
@@ -298,7 +300,7 @@ RSpec.describe Tasks::UpdateStatus, type: :interaction do
 
       it 'can update to the same status' do
         task.update!(status: :running)
-        
+
         outcome = described_class.run(
           task: task,
           new_status: 'running',
