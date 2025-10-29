@@ -14,7 +14,7 @@ gem 'devise'
 gem 'bootsnap', require: false
 gem 'puma', '~> 6.0'
 gem 'rails', '~> 8.1'
-gem 'route_translator', '~> 14.1', '>= 14.1.1'
+gem 'route_translator', '~> 15.2'
 
 ## Front-end and Asset Pipeline
 gem 'avo'

@@ -395,7 +395,7 @@ GEM
       actionpack (>= 7.0)
       railties (>= 7.0)
     rexml (3.4.4)
-    route_translator (14.2.0)
+    route_translator (15.2.0)
       actionpack (>= 6.1)
       activesupport (>= 6.1)
     rspec-core (3.13.6)
@@ -550,7 +550,7 @@ DEPENDENCIES
   rack-cors
   rails (~> 8.1)
   redis (~> 5.0)
-  route_translator (~> 14.1, >= 14.1.1)
+  route_translator (~> 15.2)
   rspec-rails
   ruby-openai (~> 7, >= 7.3)
   sentry-rails
