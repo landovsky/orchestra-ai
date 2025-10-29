@@ -1,0 +1,9 @@
+{
+  "repository": "git@github.com:landovsky/orchestrator.git",
+  "ref": "epic/models",
+  "iterations": [
+    {
+      "text": "Fix unchecked bugs listed in each section of docs/epics/image-cropping.md"
+    }
+  ]
+}
