@@ -1,5 +1,5 @@
 {
-  "repository": "git@github.com:landovsky/orchestrator.git",
+  "repository": "git@github.com:landovsky/orchestrator-ai.git",
   "ref": "epic/models",
   "iterations": [
     {
