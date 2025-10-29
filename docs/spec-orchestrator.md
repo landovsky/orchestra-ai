@@ -1,311 +1,191 @@
-# Implementation Plan: AI Agent Orchestrator
+# **Orchestra.ai - AI Agent Orchestrator**
 
-## ✅ Completed
-- Milestone 1: Core Data Models
-- Milestone 2: Core Service Wrappers (with tests)
+## **1\. Core Data Models (Schema)**
 
----
+* **User** (via Devise)
+  * email, name, google\_oauth\_token, google\_refresh\_token
+  * has\_many :credentials
+  * has\_many :notification\_channels
+  * has\_many :repositories
+  * has\_many :epics
+* **Credential** (Encrypted)
+  * name (e.g., "Personal GitHub", "OpenAI Key", "Cursor API Key")
+  * service\_name (e.g., github, openai, cursor\_agent, claude, gemini)
+  * api\_key (encrypted, using ActiveRecord::Encryption)
+  * belongs\_to :user
+* **Repository**
+  * name (e.g., "my-app")
+  * github\_url (e.g., https://github.com/my-user/my-app)
+  * belongs\_to :user
+  * belongs\_to :github\_credential, class\_name: 'Credential'
+  * has\_many :epics
+* **Epic** (The main orchestration job)
+  * title
+  * prompt (the high-level user request)
+  * base\_branch (e.g., "main" or "epic/my-feature")
+  * status (e.g., pending, generating\_spec, running, paused, completed, failed)
+  * belongs\_to :repository
+  * belongs\_to :user (the user who initiated it)
+  * belongs\_to :llm\_credential, class\_name: 'Credential'
+  * belongs\_to :cursor\_agent\_credential, class\_name: 'Credential'
+  * has\_many :tasks, \-\> { order(position: :asc) }
+* **Task** (A single step in the epic)
+  * name
+  * description (the prompt for the agent, e.g., "Add a new endpoint for /api/users")
+  * status (e.g., pending, running, pr\_open, merging, completed, failed)
+  * branch\_name (e.g., cursor-agent/task-1-abc123)
+  * pull\_request\_url
+  * cursor\_agent\_id (string, the ID from the Cursor API, e.g., "bc\_abc123")
+  * debug\_log (text, for storing agent output/errors)
+  * position (integer, for sequential ordering)
+  * belongs\_to :epic
+* **NotificationChannel**
+  * service\_name (e.g., telegram, email)
+  * channel\_id (e.g., Telegram chat ID)
+  * belongs\_to :user
 
-## Phase 3: Console-First Integration Testing
+## **2\. Core Workflows (ActiveInteractions)**
 
-**Goal:** Manually verify all external integrations work from Rails console before building automation.
+This is where all business logic lives. Controllers and Jobs *only* call these interactions.
 
-### Task 3.1: GitHub Service Console Validation
-- **Deliverable:** Document/script showing console commands
-- **Test from console:**
-  ```ruby
-  cred = Credential.create!(user: user, service_name: 'github', api_key: ENV['GITHUB_TOKEN'])
-  gh = Services::GithubService.new(cred)
+* **Credentials::Create**
+  * Inputs: user, name, service\_name, api\_key
+  * Logic: Encrypts and saves the Credential.
+* **Epics::CreateFromPrompt**
+  * Inputs: user, repository, prompt, base\_branch (optional), llm\_credential\_id, cursor\_agent\_credential\_id
+  * Logic:
+    1. Creates an Epic with status generating\_spec.
+    2. Enqueues Epics::GenerateSpecJob.perform\_async(epic.id, base\_branch).
+  * Returns: The new Epic.
+* **Epics::CreateFromManualSpec**
+  * Inputs: user, repository, tasks\_json (stringified array), base\_branch, cursor\_agent\_credential\_id
+  * Logic:
+    1. Creates Epic with status pending.
+    2. Parses tasks\_json (JSON.parse).
+    3. Iterates array, creating a Task for each string (setting description and position).
+  * Returns: The new Epic and its Tasks.
+* **Epics::Start**
+  * Inputs: user, epic
+  * Logic:
+    1. Validates epic is pending.
+    2. Sets epic.status to running.
+    3. Finds the first pending Task.
+    4. Enqueues Tasks::ExecuteJob.perform\_async(task.id).
+    5. Broadcasts update via Turbo Streams.
+* **Tasks::UpdateStatus**
+  * Inputs: task, new\_status, log\_message (optional), pr\_url (optional)
+  * Logic:
+    1. Updates task.status to new\_status.
+    2. Updates task.pull\_request\_url if provided.
+    3. Appends log\_message to task.debug\_log.
+    4. Broadcasts a Turbo Stream update (e.g., broadcast\_replace\_to "epic\_\#{task.epic\_id}", target: "task\_\#{task.id}", ...).
+* **Notifications::Send**
+  * Inputs: user, message
+  * Logic:
+    1. Finds user.notification\_channels.
+    2. For each channel, enqueues a specific job (e.g., Telegram::SendMessageJob.perform\_async(channel.id, message)).
 
-  # Test methods
-  gh.infer_base_branch('landovsky/orchestra-ai')
-  # Later: gh.merge_pull_request(task) with real PR
-  # Later: gh.delete_branch(task)
-  ```
-- **AC:** Can successfully call GitHub API from console with real credentials
+## **3\. Background Jobs (Sidekiq)**
 
-### Task 3.2: Cursor Service Console Validation
-- **Deliverable:** Console script showing agent launch
-- **Test from console:**
-  ```ruby
-  cred = Credential.create!(service_name: 'cursor_agent', api_key: ENV['CURSOR_KEY'])
-  cursor = Services::CursorAgentService.new(cred)
+* **Epics::GenerateSpecJob**
+  * Input: epic\_id, base\_branch (optional)
+  * Logic:
+    1. Get epic and llm\_credential.
+    2. If base\_branch is nil, call GithubService to infer it.
+    3. Call LlmService.new(epic.llm\_credential).generate\_spec(epic.prompt, epic.base\_branch).
+    4. The LLM should return JSON: { "tasks": \["Implement user auth", "Add /profile endpoint", ...\] }.
+    5. Parse response, create Task records.
+    6. Update epic.status to pending.
+    7. Call Notifications::Send.run\!(user: epic.user, message: "Spec for '\#{epic.title}' is ready\!").
+* **Tasks::ExecuteJob**
+  * Input: task\_id
+  * Logic:
+    1. Get task and its epic and credentials.
+    2. Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'running', log: "Launching Cursor agent...").
+    3. Generate branch\_name \= "cursor-agent/task-\#{task.id}-\#{SecureRandom.hex(4)}".
+    4. Generate webhook\_url \= "https://your-app.com/webhooks/cursor/\#{task.id}" (using Rails.application.routes.url\_helpers).
+    5. Call CursorAgentService.new(task.epic.cursor\_agent\_credential).launch\_agent(task: task, webhook\_url: webhook\_url, branch\_name: branch\_name).
+    6. This service returns the agent's ID.
+    7. Update task.update\!(cursor\_agent\_id: agent\_id, branch\_name: branch\_name).
+    8. This job is now complete. The Webhooks::CursorController will take over.
+* **Tasks::MergeJob**
+  * Input: task\_id
+  * Logic:
+    1. Get task and github\_credential.
+    2. Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'merging', log: "Agent finished. Attempting to merge PR...").
+    3. Call GithubService.new(cred).merge\_pull\_request(task).
+    4. If successful:
+    * Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'completed', log: "Merge successful.").
+    * Call GithubService.new(cred).delete\_branch(task).
+    * Call Notifications::Send.run\!(user: task.epic.user, message: "Task '\#{task.name}' complete\!").
+    * Find next\_task \= task.epic.tasks.find\_by(status: 'pending').
+    * If next\_task:
+      * Enqueue Tasks::ExecuteJob.perform\_async(next\_task.id).
+    * Else:
+      * Update task.epic.status to completed.
+      * Call Notifications::Send.run\!(user: task.epic.user, message: "Epic '\#{task.epic.title}' is complete\!").
+    5. If merge failed (e.g., conflict):
+    * Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'failed', log: "Merge conflict detected\! Manual intervention required.").
+    * Update task.epic.status to paused.
+    * Call Notifications::Send.run\!(user: task.epic.user, message: "EPIC PAUSED: Merge conflict on '\#{task.name}'").
 
-  # Create minimal test task
-  task = Task.create!(description: "Add comment to README", epic: epic, status: 'pending')
+## **4\. Key Services (lib/)**
 
-  # Launch agent manually
-  result = cursor.launch_agent(
-    task: task,
-    webhook_url: "https://your-ngrok-url/webhooks/cursor/#{task.id}",
-    branch_name: "test-manual-#{Time.now.to_i}"
-  )
-  ```
-- **AC:** Can launch Cursor agent and get back agent ID
+* **GithubService**
+  * Wrapper around the octokit gem.
+  * Methods: infer\_base\_branch, merge\_pull\_request(task) (finds PR by branch\_name and merges it), delete\_branch(task).
+* **LlmService**
+  * Adapter pattern.
+  * initialize(credential): Loads correct client.
+  * generate\_spec(prompt, base\_branch): Calls LLM to return JSON ({ "tasks": \[...\] }).
+* **CursorAgentService**
+  * initialize(credential): Stores @api\_key \= credential.api\_key.
+  * launch\_agent(task:, webhook\_url:, branch\_name:)
+    1. Builds payload:
+       {
+         "prompt": { "text": task.description },
+         "source": {
+           "repository": task.epic.repository.github\_url,
+           "ref": task.epic.base\_branch
+         },
+         "target": {
+           "branchName": branch\_name,
+           "autoCreatePr": true
+         },
+         "webhook": {
+           "url": webhook\_url,
+           "secret": "your-webhook-secret"
+         }
+       }
 
-### Task 3.3: LLM Service Console Validation
-- **Deliverable:** Console script showing spec generation
-- **Test from console:**
-  ```ruby
-  cred = Credential.create!(service_name: 'openai', api_key: ENV['OPENAI_KEY'])
-  llm = Services::LlmService.new(cred)
+    2. POSTs to https://api.cursor.com/v0/agents with Authorization: Bearer \#{@api\_key}.
+    3. Returns parsed JSON response (e.g., { "id": "bc\_abc123", ... }).
 
-  spec = llm.generate_spec(
-    "Add user authentication with email/password",
-    "main"
-  )
-  # => { "tasks": ["Create User model", "Add Devise", ...] }
-  ```
-- **AC:** Can generate task list from prompt
+## **5\. Webhook Controller**
 
----
+* **Webhooks::CursorController**
+  * Receives POST requests to /webhooks/cursor/:id (where :id is the task.id).
+  * create action:
+    1. Verify webhook secret.
+    2. task \= Task.find(params\[:id\]).
+    3. payload \= JSON.parse(request.body).
+    4. case payload.status:
+    * when 'FINISHED':
+      * pr\_url \= payload.target.prUrl
+      * Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'pr\_open', log: "Agent finished, PR created.", pr\_url: pr\_url).
+      * Enqueue Tasks::MergeJob.perform\_async(task.id).
+    * when 'ERROR':
+      * Call Tasks::UpdateStatus.run\!(task: task, new\_status: 'failed', log: "Agent failed: \#{payload.error || 'Unknown error'}").
+      * Update task.epic.status to paused.
+      * Call Notifications::Send.run\!(user: task.epic.user, message: "EPIC PAUSED: Task '\#{task.name}' failed.").
+    * when 'RUNNING':
+      * Call Tasks::UpdateStatus.run\!(task: task, log: "Agent is running...").
+    5. render json: { status: 'received' }, status: :ok.
 
-## Phase 4: Manual Epic Creation & Basic Interactions
+## **6\. UI (Views, ViewComponents, Stimulus)**
 
-**Goal:** Create Epics and Tasks manually, test execution flow from console.
-
-### Task 4.1: Epics::CreateFromManualSpec Interaction
-- **Deliverable:** Working interaction class
-- **Test from console:**
-  ```ruby
-  tasks = ["Task 1: Do X", "Task 2: Do Y", "Task 3: Do Z"]
-  result = Epics::CreateFromManualSpec.run!(
-    user: user,
-    repository: repo,
-    tasks_json: tasks.to_json,
-    base_branch: "main",
-    cursor_agent_credential: cursor_cred
-  )
-  epic = result.epic
-  epic.tasks.count # => 3
-  epic.tasks.first.position # => 1
-  ```
-- **AC:** Can create Epic with tasks from console
-
-### Task 4.2: Tasks::UpdateStatus Interaction
-- **Deliverable:** Status update with logging and broadcasting
-- **Test from console:**
-  ```ruby
-  task = epic.tasks.first
-  Tasks::UpdateStatus.run!(
-    task: task,
-    new_status: 'running',
-    log_message: "Starting Cursor agent..."
-  )
-  task.reload.debug_log # Shows appended message
-  ```
-- **AC:** Task status updates and logs append
-
-### Task 4.3: Epics::Start Interaction
-- **Deliverable:** Start epic manually from console
-- **Test from console:**
-  ```ruby
-  Epics::Start.run!(user: user, epic: epic)
-  epic.reload.status # => 'running'
-  epic.tasks.first.status # => 'pending' or 'running' if job ran
-  ```
-- **AC:** Epic status changes, first task job enqueued
-
----
-
-## Phase 5: Task Execution Engine (Console Testable)
-
-**Goal:** Run tasks end-to-end from console, observe Cursor agent behavior.
-
-### Task 5.1: Tasks::ExecuteJob (Basic)
-- **Deliverable:** Job that launches Cursor agent
-- **Test from console:**
-  ```ruby
-  task = epic.tasks.first
-  Tasks::ExecuteJob.new.perform(task.id)
-
-  task.reload
-  task.status # => 'running'
-  task.cursor_agent_id # => "bc_abc123"
-  task.branch_name # => "cursor-agent/task-1-a3f2"
-  ```
-- **AC:** Job launches agent, saves agent ID and branch
-
-### Task 5.2: Webhook Controller (Minimal)
-- **Deliverable:** Receive Cursor callbacks
-- **Setup ngrok:** `ngrok http 3000`
-- **Test manually:**
-  1. Launch agent with ngrok webhook URL
-  2. Watch webhook logs: `tail -f log/development.log`
-  3. Verify webhook receives RUNNING, FINISHED, or ERROR
-- **AC:** Controller receives and logs webhook payloads
-
-### Task 5.3: Webhook FINISHED Handler
-- **Deliverable:** Handle successful completion
-- **Test from console:**
-  ```ruby
-  # Simulate webhook payload
-  payload = {
-    'status' => 'FINISHED',
-    'target' => { 'prUrl' => 'https://github.com/user/repo/pull/123' }
-  }
-
-  # Or trigger real webhook and observe:
-  task.reload
-  task.status # => 'pr_open'
-  task.pull_request_url # => "https://..."
-  ```
-- **AC:** Task transitions to pr_open, PR URL saved
-
----
-
-## Phase 6: Simple UI (Hard-coded, Manual Refresh)
-
-**Goal:** Create Epic in browser, start from UI, refresh to see updates.
-
-### Task 6.1: EpicsController#new (Manual Spec Form)
-- **Deliverable:** Simple form (no JS)
-- **UI:** `/epics/new`
-  - Select repository (dropdown)
-  - Text input: base_branch (default: "main")
-  - Textarea: tasks (one per line)
-  - Submit button
-- **AC:** Form renders and submits
-
-### Task 6.2: EpicsController#create (Manual Spec)
-- **Deliverable:** Create action calls interaction
-- **Flow:** Submit → Epics::CreateFromManualSpec → Redirect to show
-- **AC:** Epic created, redirects to `/epics/:id`
-
-### Task 6.3: EpicsController#show (Basic, No Turbo)
-- **Deliverable:** Static epic dashboard
-- **Shows:**
-  - Epic title, status
-  - List of tasks with status badges
-  - PR links (if present)
-  - "Start Epic" button (if pending)
-  - "Refresh" button (manual refresh)
-- **AC:** Page displays epic and tasks, manual refresh shows updates
-
-### Task 6.4: "Start Epic" Button
-- **Deliverable:** POST /epics/:id/start
-- **Flow:** Click → Epics::Start → Refresh page → See first task running
-- **AC:** Can start epic from browser
-
----
-
-## Phase 7: Sequential Task Orchestration
-
-**Goal:** Complete end-to-end flow: launch → PR → merge → next task → complete.
-
-### Task 7.1: Tasks::MergeJob (Basic Merge)
-- **Deliverable:** Job that merges PR
-- **Test from console:**
-  ```ruby
-  # After task has PR open
-  Tasks::MergeJob.new.perform(task.id)
-
-  task.reload.status # => 'completed'
-  # Branch deleted from GitHub
-  ```
-- **AC:** PR merged, branch deleted, task marked completed
-
-### Task 7.2: Tasks::MergeJob (Sequential Logic)
-- **Deliverable:** Auto-start next task after merge
-- **Flow:**
-  1. Task 1 completes
-  2. Merge job finds Task 2
-  3. Task 2 ExecuteJob enqueued
-  4. (Manual refresh shows Task 2 running)
-- **AC:** Tasks execute sequentially without manual intervention
-
-### Task 7.3: Tasks::MergeJob (Epic Completion)
-- **Deliverable:** Mark epic complete when done
-- **Flow:** Last task completes → Epic status = 'completed'
-- **AC:** Epic marked complete, notification sent
-
-### Task 7.4: Webhook ERROR Handler
-- **Deliverable:** Handle agent failures
-- **Flow:** Agent fails → Epic paused → Notification sent
-- **AC:** Epic pauses on error, shows error in UI
-
----
-
-## Phase 8: Real-time UI Updates (Turbo Streams)
-
-**Goal:** Dashboard updates automatically without manual refresh.
-
-### Task 8.1: Add Turbo Stream Subscription
-- **Deliverable:** Enable ActionCable in show page
-- **Change:** Add `<%= turbo_stream_from "epic_#{@epic.id}" %>`
-- **AC:** Page subscribes to updates
-
-### Task 8.2: Broadcasting from Tasks::UpdateStatus
-- **Deliverable:** Broadcast status changes
-- **Implementation:**
-  ```ruby
-  task.broadcast_replace_to(
-    "epic_#{task.epic_id}",
-    target: "task_#{task.id}",
-    partial: "tasks/task",
-    locals: { task: task }
-  )
-  ```
-- **AC:** Task status updates appear automatically (no refresh needed)
-
-### Task 8.3: Task Partial / ViewComponent
-- **Deliverable:** Render task with proper DOM ID
-- **Template:** Each task has `id="task_#{task.id}"`
-- **Displays:** Name, status badge, PR link, debug log excerpt
-- **AC:** Task updates replace smoothly in UI
-
-### Task 8.4: Epic Status Broadcasting
-- **Deliverable:** Broadcast epic-level changes
-- **Shows:** Running → Completed/Paused transitions
-- **AC:** Epic status updates automatically
-
----
-
-## Phase 9: LLM-Generated Specs & Polish
-
-**Goal:** Generate tasks from prompt, add notifications, polish UX.
-
-### Task 9.1: Epics::GenerateSpecJob
-- **Deliverable:** Background job calling LLM
-- **Flow:** Create epic → Job generates tasks → Epic becomes pending
-- **AC:** Can create epic from prompt
-
-### Task 9.2: "Generate from Prompt" UI
-- **Deliverable:** Alternate form on /epics/new
-- **Uses:** Tabs or radio buttons to switch modes
-- **AC:** Can submit prompt, see spec generated
-
-### Task 9.3: Notifications::Send Interaction
-- **Deliverable:** Multi-channel notifications
-- **Supports:** Telegram, Email
-- **AC:** User receives notifications on completion/errors
-
-### Task 9.4: Credentials & Repositories UI
-- **Deliverable:** Management pages for setup
-- **Pages:** `/credentials`, `/repositories`
-- **AC:** User can manage API keys and repos
-
----
-
-## Testing Philosophy by Phase
-
-| Phase | Testing Approach |
-|-------|-----------------|
-| 3 | Console scripts, real APIs with test accounts |
-| 4-5 | Console + RSpec (interactions, jobs) |
-| 6-7 | Feature specs with manual verification |
-| 8-9 | Feature specs with system tests (ActionCable) |
-
-## Key Incremental Checkpoints
-
-After each phase, you should be able to:
-
-- **Phase 3:** Run all services from console with real credentials
-- **Phase 4:** Create and start epics from console
-- **Phase 5:** Watch a full task execute: launch → webhook → PR
-- **Phase 6:** Do the same from a browser (with refresh button)
-- **Phase 7:** Watch multiple tasks execute sequentially
-- **Phase 8:** Dashboard updates automatically
-- **Phase 9:** Everything works end-to-end with LLM generation
-
-This structure lets you validate each piece independently before adding complexity. Each phase delivers working functionality you can demo.
+* **EpicsController\#show (The Dashboard)**
+  * Renders the Epic details and a list of its Tasks.
+  * Includes \<%= turbo\_stream\_from "epic\_\#{epic.id}" %\>.
+  * Each task has a DOM ID: id="task\_\<%= task.id %\>".
+  * The Tasks::UpdateStatus interaction will broadcast updates that target these DOM IDs, replacing the task's partial to show the new status (e.g., showing a link to the pr\_url).
