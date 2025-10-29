@@ -4,7 +4,7 @@ class Epic < ApplicationRecord
   belongs_to :llm_credential, class_name: 'Credential', optional: true
   belongs_to :cursor_agent_credential, class_name: 'Credential', optional: true
   
-  has_many :tasks, -> { order(position: :asc) }, dependent: :destroy
+  has_many :tasks, -> { order(position: :asc) }, dependent: :destroy, inverse_of: :epic
 
   enum :status, {
     pending: 0,
