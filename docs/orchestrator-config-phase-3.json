@@ -1,0 +1,15 @@
+{
+  "repository": "git@github.com:landovsky/orchestrator.git",
+  "ref": "epic/models",
+  "iterations": [
+    {
+      "text": "Task 3.1: GitHub Service Console Validation - Create console script to test GitHub API integration with real credentials. Test infer_base_branch method. Reference: @spec-orchestrator.md"
+    },
+    {
+      "text": "Task 3.2: Cursor Service Console Validation - Create console script to test Cursor agent launch with real API credentials. Test launch_agent method with webhook URL. Reference: @spec-orchestrator.md"
+    },
+    {
+      "text": "Task 3.3: LLM Service Console Validation - Create console script to test LLM service integration. Test generate_spec method with real API credentials. Reference: @spec-orchestrator.md"
+    }
+  ]
+}
