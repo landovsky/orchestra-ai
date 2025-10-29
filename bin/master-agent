@@ -1,0 +1,922 @@
+#!/bin/bash
+# bin/master-agent
+
+set -euo pipefail
+
+# Master Agent - Cursor Background Agents Orchestrator with Local Git Orchestration
+# Usage: ./master-agent.sh <config.json> [update_interval_seconds]
+#
+# Dual Repository URL System:
+# - API calls (launching agents):  Uses HTTPS URLs (required by Cursor API)
+# - Local git operations:          Uses SSH URLs (requires ssh-agent with loaded keys)
+# - Config can specify either format - automatically converts as needed
+#
+# Features:
+# - Automatically converts between HTTPS/SSH formats as needed
+# - Requires SSH key to be loaded in ssh-agent for local operations
+# - Local workspace for automatic branch merging
+# - Active agent status detection with 5-second polling
+# - Comprehensive logging and debug mode
+
+# Colors and formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Configuration
+CONFIG_FILE="${1:-}"
+UPDATE_INTERVAL="${2:-10}"
+API_BASE_URL="https://api.cursor.com/v0"
+API_KEY="${CURSOR_API_KEY:-}"
+
+# Workspace
+WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/.master-agent-workspace}"
+LOG_FILE="${LOG_FILE:-tmp/master-agent-$(date +%Y%m%d-%H%M%S).log}"
+MASTER_AGENT_REPORT_FILE="${MASTER_AGENT_REPORT_FILE:-tmp/master-agent-report-$(date +%Y%m%d-%H%M%S).md}"
+
+# State tracking (using indexed arrays for Bash 3.2 compatibility)
+declare -a AGENT_IDS=()
+declare -a AGENT_STATUS=()
+declare -a AGENT_BRANCHES=()
+declare -a AGENT_ITERATIONS=()
+declare -a AGENT_START_TIME=()
+CURRENT_ITERATION=0
+TOTAL_ITERATIONS=0
+REPOSITORY=""
+SSH_REPOSITORY=""
+REF=""
+RUNNING=true
+DEBUG_MODE="${DEBUG:-false}"
+
+# Cleanup handler
+cleanup() {
+    echo -e "\n${YELLOW}Shutting down Master Agent...${NC}"
+    RUNNING=false
+    tput cnorm # Show cursor
+
+    # Generate report
+    generate_report
+
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+# Logging
+log() {
+    local level=$1
+    shift
+    local message="$*"
+    local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+
+    if [ "$DEBUG_MODE" == "true" ]; then
+        echo -e "${CYAN}[$level]${NC} $message" >&2
+    fi
+}
+
+# Validate requirements
+check_requirements() {
+    local missing=()
+
+    command -v curl >/dev/null 2>&1 || missing+=("curl")
+    command -v jq >/dev/null 2>&1 || missing+=("jq")
+    command -v git >/dev/null 2>&1 || missing+=("git")
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${RED}Error: Missing required tools: ${missing[*]}${NC}"
+        echo "Please install: brew install ${missing[*]}"
+        exit 1
+    fi
+
+    if [ -z "$API_KEY" ]; then
+        echo -e "${RED}Error: CURSOR_API_KEY environment variable not set${NC}"
+        echo "Please set it with: export CURSOR_API_KEY='your-api-key'"
+        exit 1
+    fi
+
+    if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+        echo -e "${RED}Error: Config file not provided or not found${NC}"
+        echo "Usage: $0 <config.json> [update_interval_seconds]"
+        exit 1
+    fi
+
+    # Check SSH keys
+    echo -e "${CYAN}Checking SSH configuration...${NC}"
+    if ssh-add -l >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ SSH keys are loaded in ssh-agent${NC}"
+        log "INFO" "SSH keys verified in ssh-agent"
+    else
+        echo -e "${YELLOW}⚠ Warning: No SSH keys found in ssh-agent${NC}"
+        echo -e "${YELLOW}You may need to add your SSH key:${NC}"
+        echo -e "  ${CYAN}ssh-add ~/.ssh/id_rsa${NC}"
+        echo -e "  ${CYAN}ssh-add -l  # verify${NC}"
+        echo ""
+        read -p "Continue anyway? (y/n) " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+        log "WARN" "Proceeding without SSH keys in agent"
+    fi
+}
+
+# Load configuration
+load_config() {
+    echo -e "${CYAN}Loading configuration from $CONFIG_FILE...${NC}"
+    log "INFO" "Loading configuration from $CONFIG_FILE"
+
+    local repo_from_config=$(jq -r '.repository' "$CONFIG_FILE")
+    REF=$(jq -r '.ref' "$CONFIG_FILE")
+    TOTAL_ITERATIONS=$(jq '.iterations | length' "$CONFIG_FILE")
+
+    if [ -z "$repo_from_config" ] || [ "$repo_from_config" == "null" ]; then
+        echo -e "${RED}Error: 'repository' field missing in config${NC}"
+        exit 1
+    fi
+
+    if [ -z "$REF" ] || [ "$REF" == "null" ]; then
+        echo -e "${RED}Error: 'ref' field missing in config${NC}"
+        exit 1
+    fi
+
+    if [ "$TOTAL_ITERATIONS" -eq 0 ]; then
+        echo -e "${RED}Error: No iterations defined in config${NC}"
+        exit 1
+    fi
+
+    # Always store HTTPS URL for API calls, SSH URL for local git
+    REPOSITORY=$(convert_to_https_url "$repo_from_config")
+    SSH_REPOSITORY=$(convert_to_ssh_url "$repo_from_config")
+
+    echo -e "${GREEN}Configuration loaded successfully${NC}"
+    echo -e "  Repository (API):   ${BOLD}$REPOSITORY${NC}"
+    echo -e "  Repository (Local): ${BOLD}${CYAN}$SSH_REPOSITORY${NC}"
+    echo -e "  Branch/Ref:         ${BOLD}$REF${NC}"
+    echo -e "  Total iterations:   ${BOLD}$TOTAL_ITERATIONS${NC}"
+    echo -e "  Workspace:          ${BOLD}$WORKSPACE_DIR${NC}"
+    echo -e "  Log file:           ${BOLD}$LOG_FILE${NC}"
+    echo ""
+
+    log "INFO" "Config loaded - HTTPS Repo: $REPOSITORY, SSH Repo: $SSH_REPOSITORY, Ref: $REF, Iterations: $TOTAL_ITERATIONS"
+}
+
+# Convert SSH URL to HTTPS format (for API calls)
+convert_to_https_url() {
+    local url=$1
+
+    # If already HTTPS format, return as-is
+    if [[ "$url" =~ ^https://github\.com/ ]]; then
+        echo "$url"
+        return 0
+    fi
+
+    # Convert SSH to HTTPS
+    if [[ "$url" =~ ^git@github\.com:(.+)$ ]]; then
+        local repo_path="${BASH_REMATCH[1]}"
+        # Remove .git suffix if present
+        repo_path="${repo_path%.git}"
+        echo "https://github.com/${repo_path}"
+        log "INFO" "Converted SSH URL to HTTPS for API: https://github.com/${repo_path}"
+        return 0
+    fi
+
+    # Return original if we can't convert
+    echo "$url"
+}
+
+# Convert HTTPS URL to SSH format (for local git operations)
+convert_to_ssh_url() {
+    local url=$1
+
+    # If already SSH format, return as-is
+    if [[ "$url" =~ ^git@github\.com: ]]; then
+        echo "$url"
+        return 0
+    fi
+
+    # Convert HTTPS to SSH
+    if [[ "$url" =~ ^https://github\.com/(.+)$ ]]; then
+        local repo_path="${BASH_REMATCH[1]}"
+        # Remove .git suffix if present
+        repo_path="${repo_path%.git}"
+        echo "git@github.com:${repo_path}.git"
+        log "INFO" "Converted HTTPS URL to SSH for local git: git@github.com:${repo_path}.git"
+        return 0
+    fi
+
+    # Return original if we can't convert
+    echo "$url"
+}
+
+# Setup local git workspace
+setup_workspace() {
+    echo -e "${CYAN}Setting up local git workspace...${NC}"
+    log "INFO" "Setting up workspace at $WORKSPACE_DIR"
+
+    if [ ! -d "$WORKSPACE_DIR" ]; then
+        echo -e "${YELLOW}Cloning repository via SSH...${NC}"
+        echo -e "${CYAN}Repository: $SSH_REPOSITORY${NC}"
+        mkdir -p "$(dirname "$WORKSPACE_DIR")"
+
+        # Test SSH connection first
+        echo -e "${CYAN}Testing SSH connection to GitHub...${NC}"
+        ssh_test_output=$(ssh -T git@github.com 2>&1 || true)
+        if echo "$ssh_test_output" | grep -qi "successfully authenticated\|You've successfully authenticated"; then
+            echo -e "${GREEN}✓ SSH connection verified${NC}"
+            log "INFO" "SSH connection to GitHub verified"
+        else
+            echo -e "${YELLOW}⚠ Warning: Could not verify SSH authentication${NC}"
+            echo -e "${YELLOW}SSH test output: $ssh_test_output${NC}"
+            echo -e "${YELLOW}Proceeding with clone anyway...${NC}"
+            log "WARN" "SSH test unclear, but proceeding: $ssh_test_output"
+        fi
+
+        if ! git clone "$SSH_REPOSITORY" "$WORKSPACE_DIR" 2>&1 | tee -a "$LOG_FILE"; then
+            echo -e "${RED}Failed to clone repository${NC}"
+            log "ERROR" "Failed to clone repository: $SSH_REPOSITORY"
+            echo -e "${YELLOW}Make sure your SSH key is added to ssh-agent:${NC}"
+            echo -e "  ssh-add ~/.ssh/id_rsa"
+            echo -e "  ssh-add -l  # verify key is loaded"
+            exit 1
+        fi
+
+        log "INFO" "Repository cloned successfully via SSH"
+    else
+        echo -e "${YELLOW}Workspace exists, updating...${NC}"
+        log "INFO" "Workspace exists, fetching updates"
+
+        cd "$WORKSPACE_DIR" || exit 1
+
+        # Update remote URL to SSH if it's currently HTTPS
+        local current_url=$(git config --get remote.origin.url)
+
+        if [ "$current_url" != "$SSH_REPOSITORY" ]; then
+            echo -e "${CYAN}Updating remote URL to SSH...${NC}"
+            git remote set-url origin "$SSH_REPOSITORY"
+            log "INFO" "Updated remote URL from $current_url to $SSH_REPOSITORY"
+        fi
+
+        cd - > /dev/null
+    fi
+
+    cd "$WORKSPACE_DIR" || exit 1
+
+    # Configure git to avoid merge conflicts prompts
+    git config pull.rebase false 2>/dev/null || true
+    git config merge.conflictstyle diff3 2>/dev/null || true
+
+    # Fetch latest
+    echo -e "${CYAN}Fetching latest changes via SSH...${NC}"
+    if ! git fetch origin 2>&1 | tee -a "$LOG_FILE"; then
+        echo -e "${RED}Failed to fetch from origin${NC}"
+        log "ERROR" "Failed to fetch from origin"
+        echo -e "${YELLOW}Make sure your SSH key is added to ssh-agent:${NC}"
+        echo -e "  ssh-add ~/.ssh/id_rsa"
+        exit 1
+    fi
+
+    # Checkout and update working branch
+    echo -e "${CYAN}Checking out $REF...${NC}"
+    git checkout "$REF" 2>&1 | tee -a "$LOG_FILE" || {
+        echo -e "${YELLOW}Branch doesn't exist locally, creating from origin...${NC}"
+        git checkout -b "$REF" "origin/$REF" 2>&1 | tee -a "$LOG_FILE"
+    }
+
+    git pull origin "$REF" 2>&1 | tee -a "$LOG_FILE" || {
+        echo -e "${YELLOW}Warning: Could not pull latest changes${NC}"
+    }
+
+    echo -e "${GREEN}Workspace ready (using SSH)${NC}"
+    log "INFO" "Workspace setup complete with SSH"
+    cd - > /dev/null
+}
+
+# Extract branch name from agent status/response
+extract_agent_branch() {
+    local agent_id=$1
+    local status_json=$2
+
+    # Try multiple possible fields where branch name might be
+    # Primary: .target.branchName (confirmed location for Cursor API)
+    local branch=$(echo "$status_json" | jq -r '
+        .target.branchName //
+        .branchName //
+        .branch //
+        .result.branch //
+        .metadata.branch //
+        .source.ref //
+        .git_branch //
+        empty
+    ')
+
+    if [ -n "$branch" ] && [ "$branch" != "null" ]; then
+        echo "$branch"
+        log "INFO" "Extracted branch '$branch' for agent $agent_id"
+        return 0
+    fi
+
+    log "WARN" "Could not extract branch for agent $agent_id"
+    log "DEBUG" "Status JSON: $status_json"
+    return 1
+}
+
+# Merge agent branch into working branch
+merge_agent_branch() {
+    local agent_id=$1
+    local agent_branch=$2
+    local iteration=$3
+
+    echo -e "\n${CYAN}Merging agent branch into working branch...${NC}"
+    log "INFO" "Starting merge of branch '$agent_branch' (iteration $((iteration + 1)))"
+
+    cd "$WORKSPACE_DIR" || return 1
+
+    # Fetch the agent's branch
+    echo -e "${YELLOW}Fetching branch: $agent_branch${NC}"
+    if ! git fetch origin "$agent_branch" 2>&1 | tee -a "$LOG_FILE"; then
+        echo -e "${RED}Failed to fetch agent branch: $agent_branch${NC}"
+        log "ERROR" "Failed to fetch branch: $agent_branch"
+        cd - > /dev/null
+        return 1
+    fi
+
+    # Ensure we're on the working branch
+    git checkout "$REF" 2>&1 | tee -a "$LOG_FILE"
+
+    # Attempt merge
+    echo -e "${YELLOW}Merging: $agent_branch -> $REF${NC}"
+    if git merge "origin/$agent_branch" --no-edit -m "Merge agent iteration $((iteration + 1)) [Agent: $agent_id]" 2>&1 | tee -a "$LOG_FILE"; then
+        echo -e "${GREEN}✓ Merge successful${NC}"
+        log "INFO" "Merge successful for iteration $((iteration + 1))"
+
+        # Push merged changes
+        echo -e "${YELLOW}Pushing merged changes...${NC}"
+        if git push origin "$REF" 2>&1 | tee -a "$LOG_FILE"; then
+            echo -e "${GREEN}✓ Changes pushed to remote${NC}"
+            log "INFO" "Pushed merged changes to origin/$REF"
+
+            # Optional: Delete the agent's branch
+            echo -e "${YELLOW}Cleaning up remote branch...${NC}"
+            git push origin --delete "$agent_branch" 2>&1 | tee -a "$LOG_FILE" || {
+                echo -e "${YELLOW}Note: Could not delete remote branch (may not have permissions)${NC}"
+                log "WARN" "Could not delete remote branch: $agent_branch"
+            }
+
+            cd - > /dev/null
+            return 0
+        else
+            echo -e "${RED}Failed to push merged changes${NC}"
+            log "ERROR" "Failed to push merged changes"
+            cd - > /dev/null
+            return 1
+        fi
+    else
+        echo -e "${RED}✗ Merge conflict detected!${NC}"
+        log "ERROR" "Merge conflict detected for branch: $agent_branch"
+
+        # Abort the merge
+        git merge --abort 2>&1 | tee -a "$LOG_FILE"
+
+        echo -e "${YELLOW}You can manually resolve this by:${NC}"
+        echo -e "  cd $WORKSPACE_DIR"
+        echo -e "  git merge origin/$agent_branch"
+        echo -e "  # Resolve conflicts"
+        echo -e "  git commit"
+        echo -e "  git push origin $REF"
+
+        cd - > /dev/null
+        return 1
+    fi
+}
+
+# API call with retry logic
+api_call() {
+    local method=$1
+    local endpoint=$2
+    local data=${3:-}
+    local max_retries=3
+    local retry_delay=2
+
+    for attempt in $(seq 1 $max_retries); do
+        local response
+        if [ -n "$data" ]; then
+            response=$(curl -s -w "\n%{http_code}" \
+                -X "$method" "$API_BASE_URL/$endpoint" \
+                -H "Authorization: Bearer $API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "$data" 2>&1)
+        else
+            response=$(curl -s -w "\n%{http_code}" \
+                -X "$method" "$API_BASE_URL/$endpoint" \
+                -H "Authorization: Bearer $API_KEY" 2>&1)
+        fi
+
+        local http_code=$(echo "$response" | tail -n1)
+        local body=$(echo "$response" | sed '$d')
+
+        if [ "$http_code" -eq 429 ]; then
+            echo -e "${YELLOW}Rate limited (attempt $attempt/$max_retries), retrying in ${retry_delay}s...${NC}" >&2
+            log "WARN" "Rate limited on $method $endpoint, retry $attempt"
+            sleep $retry_delay
+            retry_delay=$((retry_delay * 2))
+            continue
+        fi
+
+        echo "$response"
+        return 0
+    done
+
+    echo "$response"
+    return 1
+}
+
+# API: Launch a new agent
+launch_agent() {
+    local iteration_index=$1
+    local prompt_text
+
+    prompt_text=$(jq -r ".iterations[$iteration_index].text" "$CONFIG_FILE")
+
+    if [ -z "$prompt_text" ] || [ "$prompt_text" == "null" ]; then
+        echo -e "${RED}Error: No text for iteration $iteration_index${NC}"
+        log "ERROR" "No text for iteration $iteration_index"
+        return 1
+    fi
+
+    log "INFO" "Launching agent for iteration $((iteration_index + 1)): ${prompt_text:0:50}..."
+
+    # Use HTTPS URL for API calls (Cursor API requires HTTPS)
+    log "INFO" "Using HTTPS URL for agent API: $REPOSITORY"
+
+    local payload
+    payload=$(jq -n \
+        --arg text "$prompt_text" \
+        --arg repo "$REPOSITORY" \
+        --arg ref "$REF" \
+        '{
+            prompt: {
+                text: $text
+            },
+            source: {
+                repository: $repo,
+                ref: $ref
+            }
+        }')
+
+    local response
+    response=$(api_call "POST" "agents" "$payload")
+
+    local http_code=$(echo "$response" | tail -n1)
+    local body=$(echo "$response" | sed '$d')
+
+    if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+        local agent_id=$(echo "$body" | jq -r '.id')
+        log "INFO" "Agent launched successfully: $agent_id"
+        echo "$agent_id"
+        return 0
+    else
+        local error_msg=$(echo "$body" | jq -r '.error // .message // "Unknown error"' 2>/dev/null || echo "Unknown error")
+        echo -e "${RED}Error launching agent (HTTP $http_code): $error_msg${NC}" >&2
+        log "ERROR" "Failed to launch agent: HTTP $http_code - $error_msg"
+        log "DEBUG" "Response body: $body"
+        return 1
+    fi
+}
+
+# API: Get agent status
+get_agent_status() {
+    local agent_id=$1
+
+    local response
+    response=$(api_call "GET" "agents/$agent_id")
+
+    local http_code=$(echo "$response" | tail -n1)
+    local body=$(echo "$response" | sed '$d')
+
+    if [ "$http_code" -eq 200 ]; then
+        echo "$body"
+        return 0
+    else
+        log "WARN" "Failed to get status for agent $agent_id: HTTP $http_code"
+        echo "{\"status\":\"error\",\"error\":\"HTTP $http_code\"}"
+        return 1
+    fi
+}
+
+# Normalize status from various possible API responses
+normalize_status() {
+    local status_json=$1
+
+    # Try multiple possible status fields
+    local raw_status=$(echo "$status_json" | jq -r '
+        .status //
+        .state //
+        .agent_status //
+        .current_status //
+        "unknown"
+    ' | tr '[:upper:]' '[:lower:]')
+
+    log "DEBUG" "Raw status: $raw_status"
+
+    case "$raw_status" in
+        running|working|in_progress|active|processing)
+            echo "running"
+            ;;
+        completed|finished|success|done|succeeded)
+            echo "completed"
+            ;;
+        failed|error|cancelled|canceled|aborted)
+            echo "failed"
+            ;;
+        pending|queued|waiting|idle|starting)
+            echo "pending"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+# Format duration
+format_duration() {
+    local start_time=$1
+    local current_time=$(date +%s)
+    local duration=$((current_time - start_time))
+
+    local hours=$((duration / 3600))
+    local minutes=$(((duration % 3600) / 60))
+    local seconds=$((duration % 60))
+
+    if [ $hours -gt 0 ]; then
+        printf "%dh %dm %ds" $hours $minutes $seconds
+    elif [ $minutes -gt 0 ]; then
+        printf "%dm %ds" $minutes $seconds
+    else
+        printf "%ds" $seconds
+    fi
+}
+
+# Get status color and symbol
+get_status_display() {
+    local status=$1
+
+    case "$status" in
+        "running")
+            echo -e "${YELLOW}⏳ RUNNING${NC}"
+            ;;
+        "completed")
+            echo -e "${GREEN}✓ COMPLETED${NC}"
+            ;;
+        "failed")
+            echo -e "${RED}✗ FAILED${NC}"
+            ;;
+        "pending")
+            echo -e "${CYAN}⋯ PENDING${NC}"
+            ;;
+        *)
+            echo -e "${MAGENTA}? $status${NC}"
+            ;;
+    esac
+}
+
+# Draw the interactive dashboard
+draw_dashboard() {
+    clear
+    tput civis # Hide cursor
+
+    echo -e "${BOLD}${BLUE}╔════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${BLUE}║            MASTER AGENT - CURSOR ORCHESTRATOR (HTTPS/SSH Mode)             ║${NC}"
+    echo -e "${BOLD}${BLUE}╚════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    echo -e "${BOLD}Configuration:${NC}"
+    echo -e "  Repository (API):   ${CYAN}$REPOSITORY${NC}"
+    echo -e "  Repository (Local): ${CYAN}$SSH_REPOSITORY${NC}"
+    echo -e "  Branch:             ${CYAN}$REF${NC}"
+    echo -e "  Workspace:          ${CYAN}$WORKSPACE_DIR${NC}"
+    echo -e "  Progress:           ${BOLD}$CURRENT_ITERATION${NC} / ${BOLD}$TOTAL_ITERATIONS${NC} iterations"
+    echo ""
+
+    echo -e "${BOLD}Active Agents:${NC}"
+    echo -e "${BOLD}────────────────────────────────────────────────────────────────────────────${NC}"
+
+    if [ ${#AGENT_IDS[@]} -eq 0 ]; then
+        echo -e "  ${YELLOW}No agents launched yet...${NC}"
+    else
+        for i in "${!AGENT_IDS[@]}"; do
+            local agent_id="${AGENT_IDS[$i]}"
+            local status="${AGENT_STATUS[$i]:-unknown}"
+            local iteration="${AGENT_ITERATIONS[$i]:-?}"
+            local start_time="${AGENT_START_TIME[$i]:-$(date +%s)}"
+            local branch="${AGENT_BRANCHES[$i]:--}"
+            local duration=$(format_duration "$start_time")
+            local status_display=$(get_status_display "$status")
+
+            echo -e "  ${BOLD}[$((iteration + 1))]${NC} $status_display │ ${duration} │ ${agent_id:0:12}..."
+            if [ "$branch" != "-" ] && [ -n "$branch" ]; then
+                echo -e "      └─ Branch: ${CYAN}$branch${NC}"
+            fi
+        done
+    fi
+
+    echo -e "${BOLD}────────────────────────────────────────────────────────────────────────────${NC}"
+    echo ""
+    echo -e "${YELLOW}Press Ctrl+C to stop${NC} │ Next update in: ${UPDATE_INTERVAL}s │ Log: $LOG_FILE"
+
+    if [ "$DEBUG_MODE" == "true" ]; then
+        echo -e "${MAGENTA}[DEBUG MODE ENABLED]${NC}"
+    fi
+}
+
+# Check if agent is in terminal state
+is_terminal_state() {
+    local status=$1
+    case "$status" in
+        "completed"|"failed")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Wait for agent to complete with active polling
+wait_for_agent_completion() {
+    local agent_id=$1
+    local agent_index=$2
+    local max_wait=7200  # 2 hours max
+    local elapsed=0
+    local check_interval=5  # Check every 5 seconds when waiting
+
+    log "INFO" "Waiting for agent $agent_id to complete"
+
+    while [ $elapsed -lt $max_wait ]; do
+        local status_json=$(get_agent_status "$agent_id")
+        local status=$(normalize_status "$status_json")
+
+        AGENT_STATUS[$agent_index]=$status
+        log "DEBUG" "Agent $agent_id status: $status (elapsed: ${elapsed}s)"
+
+        if is_terminal_state "$status"; then
+            log "INFO" "Agent $agent_id reached terminal state: $status"
+
+            # Try to extract branch
+            local branch
+            if branch=$(extract_agent_branch "$agent_id" "$status_json"); then
+                AGENT_BRANCHES[$agent_index]=$branch
+            fi
+
+            return 0
+        fi
+
+        # Update display while waiting
+        draw_dashboard
+
+        sleep $check_interval
+        elapsed=$((elapsed + check_interval))
+    done
+
+    log "WARN" "Agent $agent_id timeout after ${max_wait}s"
+    echo -e "${YELLOW}Warning: Agent timeout after waiting ${max_wait}s${NC}"
+    return 1
+}
+
+# Generate final report
+generate_report() {
+    local report_file=$MASTER_AGENT_REPORT_FILE
+
+    cat > "$report_file" <<EOF
+# Master Agent Execution Report
+
+**Repository:** $REPOSITORY
+**Branch:** $REF
+**Date:** $(date)
+**Workspace:** $WORKSPACE_DIR
+
+## Summary
+- Total Iterations: $TOTAL_ITERATIONS
+- Agents Launched: ${#AGENT_IDS[@]}
+- Completed: $(printf '%s\n' "${AGENT_STATUS[@]}" | grep -c "completed" || echo 0)
+- Failed: $(printf '%s\n' "${AGENT_STATUS[@]}" | grep -c "failed" || echo 0)
+
+## Agent Details
+
+EOF
+
+    for i in "${!AGENT_IDS[@]}"; do
+        local iteration="${AGENT_ITERATIONS[$i]}"
+        local prompt=$(jq -r ".iterations[$iteration].text" "$CONFIG_FILE")
+
+        cat >> "$report_file" <<EOF
+### Iteration $((iteration + 1))
+- **Agent ID:** \`${AGENT_IDS[$i]}\`
+- **Status:** ${AGENT_STATUS[$i]}
+- **Branch:** ${AGENT_BRANCHES[$i]:--}
+- **Duration:** $(format_duration "${AGENT_START_TIME[$i]}")
+- **Prompt:** ${prompt:0:100}...
+
+EOF
+    done
+
+    echo -e "${GREEN}Report saved to: $report_file${NC}"
+    log "INFO" "Generated report: $report_file"
+}
+
+# Main orchestration loop
+run_master_agent() {
+    local last_update=$(date +%s)
+
+    while $RUNNING; do
+        local current_time=$(date +%s)
+
+        # Launch next agent if we're ready
+        if [ $CURRENT_ITERATION -lt $TOTAL_ITERATIONS ]; then
+            local should_launch=false
+
+            if [ ${#AGENT_IDS[@]} -eq 0 ]; then
+                # No agents yet, launch first one
+                should_launch=true
+                log "INFO" "No agents yet, launching first iteration"
+            else
+                # Check if the last agent is in terminal state
+                local last_idx=$((${#AGENT_IDS[@]} - 1))
+                local last_status="${AGENT_STATUS[$last_idx]:-unknown}"
+
+                log "DEBUG" "Checking if should launch next: last_status=$last_status"
+
+                if is_terminal_state "$last_status"; then
+                    should_launch=true
+                    log "INFO" "Last agent in terminal state ($last_status), ready to launch next"
+
+                    # If last agent completed successfully, merge its changes
+                    if [ "$last_status" == "completed" ]; then
+                        local last_agent_id="${AGENT_IDS[$last_idx]}"
+                        local last_branch="${AGENT_BRANCHES[$last_idx]:-}"
+                        local last_iteration="${AGENT_ITERATIONS[$last_idx]}"
+
+                        if [ -n "$last_branch" ] && [ "$last_branch" != "-" ]; then
+                            echo -e "\n${CYAN}Merging changes from completed agent...${NC}"
+                            if merge_agent_branch "$last_agent_id" "$last_branch" "$last_iteration"; then
+                                echo -e "${GREEN}✓ Changes merged successfully${NC}"
+                                log "INFO" "Successfully merged iteration $((last_iteration + 1))"
+                                sleep 2
+                            else
+                                echo -e "${RED}✗ Failed to merge changes${NC}"
+                                log "ERROR" "Failed to merge iteration $((last_iteration + 1))"
+                                echo -e "${YELLOW}Stopping due to merge failure${NC}"
+                                RUNNING=false
+                                break
+                            fi
+                        else
+                            echo -e "${YELLOW}Warning: No branch info for completed agent${NC}"
+                            log "WARN" "No branch information for agent $last_agent_id"
+                        fi
+                    fi
+                fi
+            fi
+
+            if $should_launch; then
+                echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                echo -e "${BOLD}Launching iteration $((CURRENT_ITERATION + 1)) of $TOTAL_ITERATIONS${NC}"
+                echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+                local agent_id
+                if agent_id=$(launch_agent "$CURRENT_ITERATION"); then
+                    local agent_idx=${#AGENT_IDS[@]}
+                    AGENT_IDS+=("$agent_id")
+                    AGENT_STATUS+=("running")
+                    AGENT_ITERATIONS+=("$CURRENT_ITERATION")
+                    AGENT_START_TIME+=("$(date +%s)")
+                    AGENT_BRANCHES+=("-")
+                    CURRENT_ITERATION=$((CURRENT_ITERATION + 1))
+
+                    echo -e "${GREEN}✓ Agent launched: $agent_id${NC}"
+                    log "INFO" "Agent $agent_id launched for iteration $CURRENT_ITERATION"
+
+                    # Wait for this agent to complete before launching next
+                    echo -e "${YELLOW}Waiting for agent to complete...${NC}"
+                    wait_for_agent_completion "$agent_id" "$agent_idx"
+
+                else
+                    echo -e "${RED}✗ Failed to launch agent${NC}"
+                    log "ERROR" "Failed to launch agent for iteration $((CURRENT_ITERATION + 1))"
+                    echo -e "${YELLOW}Will retry on next cycle...${NC}"
+                    sleep 5
+                fi
+
+                last_update=$current_time
+            fi
+        else
+            # All iterations launched, check if all are done
+            local all_done=true
+            for i in "${!AGENT_IDS[@]}"; do
+                local status="${AGENT_STATUS[$i]:-unknown}"
+                if ! is_terminal_state "$status"; then
+                    all_done=false
+                    # Update this agent's status
+                    local agent_id="${AGENT_IDS[$i]}"
+                    local status_json=$(get_agent_status "$agent_id")
+                    AGENT_STATUS[$i]=$(normalize_status "$status_json")
+                fi
+            done
+
+            if $all_done; then
+                echo -e "\n${GREEN}${BOLD}All iterations completed!${NC}"
+                log "INFO" "All iterations completed"
+                RUNNING=false
+                break
+            fi
+        fi
+
+        # Periodic status updates for running agents
+        if [ $((current_time - last_update)) -ge $UPDATE_INTERVAL ]; then
+            log "DEBUG" "Periodic status update"
+            for i in "${!AGENT_IDS[@]}"; do
+                local status="${AGENT_STATUS[$i]:-unknown}"
+                if ! is_terminal_state "$status"; then
+                    local agent_id="${AGENT_IDS[$i]}"
+                    local status_json=$(get_agent_status "$agent_id")
+                    local new_status=$(normalize_status "$status_json")
+                    AGENT_STATUS[$i]=$new_status
+
+                    log "DEBUG" "Updated agent $agent_id: $status -> $new_status"
+
+                    # Try to get branch if we don't have it
+                    if [ "${AGENT_BRANCHES[$i]}" == "-" ]; then
+                        local branch
+                        if branch=$(extract_agent_branch "$agent_id" "$status_json"); then
+                            AGENT_BRANCHES[$i]=$branch
+                        fi
+                    fi
+                fi
+            done
+
+            last_update=$current_time
+        fi
+
+        # Draw dashboard
+        draw_dashboard
+
+        sleep 1
+    done
+
+    tput cnorm # Show cursor
+}
+
+# Main
+main() {
+    echo -e "${BOLD}${BLUE}"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    echo "║       Master Agent - Cursor Orchestrator v2.0              ║"
+    echo "║         HTTPS for API | SSH for Local Git                  ║"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+
+    check_requirements
+    load_config
+    setup_workspace
+
+    echo -e "${GREEN}Starting Master Agent orchestration...${NC}"
+    echo -e "${YELLOW}Dashboard will appear in 3 seconds...${NC}"
+    echo -e "${CYAN}Log file: $LOG_FILE${NC}"
+    echo -e "${CYAN}Using HTTPS for API calls, SSH for local git operations${NC}"
+    log "INFO" "Master Agent started"
+    sleep 3
+
+    run_master_agent
+
+    echo -e "\n${GREEN}${BOLD}Master Agent finished.${NC}"
+    echo -e "\n${BOLD}Final Summary:${NC}"
+    echo -e "  Total iterations: ${BOLD}$TOTAL_ITERATIONS${NC}"
+    echo -e "  Agents launched: ${BOLD}${#AGENT_IDS[@]}${NC}"
+
+    local completed=0
+    local failed=0
+    for i in "${!AGENT_IDS[@]}"; do
+        local status="${AGENT_STATUS[$i]:-unknown}"
+        case "$status" in
+            "completed")
+                completed=$((completed + 1))
+                ;;
+            "failed")
+                failed=$((failed + 1))
+                ;;
+        esac
+    done
+
+    echo -e "  Completed: ${GREEN}${BOLD}$completed${NC}"
+    echo -e "  Failed: ${RED}${BOLD}$failed${NC}"
+    echo ""
+    echo -e "${CYAN}Workspace: $WORKSPACE_DIR${NC}"
+    echo -e "${CYAN}Log file: $LOG_FILE${NC}"
+    echo ""
+}
+
+main

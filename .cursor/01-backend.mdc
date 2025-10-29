@@ -1,0 +1,15 @@
+---
+description: Backend conventions
+alwaysApply: false
+---
+- Use UUIDs as primary keys.
+- Keep models thin.
+- Business domains
+  - separate business logic by domain
+  - singularize domains, store in app/domains/ (eg app/customer/services/create.rb)
+- business logic
+  - Implement with ActiveInteraction, inherit from ApplicationService
+  - store domain services in domains (eg app/customer/services/create)
+  - store general services in app/services
+  - try passing objects (records) as much as possible (not ids)
+- use Jobs to encapsulate services if necessary

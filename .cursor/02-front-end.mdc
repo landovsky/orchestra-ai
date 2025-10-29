@@ -1,0 +1,9 @@
+---
+description: Front-end instructions
+alwaysApply: false
+---
+
+Views
+- create ViewComponent's, inherit from BaseComponent
+- load data in controllers
+- don't use views, in controllers render ViewComponent directly (eg Customer::PageComponent.new) - don't use traditional views

@@ -1,0 +1,7 @@
+---
+description: Core assumptions
+alwaysApply: true
+---
+
+Stack: Rails, ViewComponent (erb), Tailwind, Stimulus JS, Sidekiq (Redis), Postgresql
+Docs: Any documentation except main README.md belongs to docs/
