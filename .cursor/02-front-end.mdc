@@ -6,4 +6,7 @@ alwaysApply: false
 Views
 - create ViewComponent's, inherit from BaseComponent
 - load data in controllers
-- don't use views, in controllers render ViewComponent directly (eg Customer::PageComponent.new) - don't use traditional views
+- render ViewComponent directly from controller actions (eg Customer::PageComponent.new) - don't use traditional views (eg show.html.erb)
+
+Testing support
+- decorate HTML elements with classes and ids that will make css selectors legible and easier to debug
