@@ -4,6 +4,7 @@ class EpicsController < ApplicationController
   def new
     @epic = Epic.new
     @repositories = current_user.repositories
+    render Epics::NewPageComponent.new(epic: @epic, repositories: @repositories)
   end
 
   def create
@@ -26,11 +27,12 @@ class EpicsController < ApplicationController
       @epic = Epic.new
       @repositories = current_user.repositories
       flash.now[:alert] = outcome.errors.full_messages.join(", ")
-      render :new, status: :unprocessable_entity
+      render Epics::NewPageComponent.new(epic: @epic, repositories: @repositories), status: :unprocessable_entity
     end
   end
 
   def show
     @epic = current_user.epics.includes(tasks: []).find(params[:id])
+    render Epics::ShowPageComponent.new(epic: @epic)
   end
 end
