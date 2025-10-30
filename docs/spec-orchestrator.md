@@ -34,7 +34,7 @@
   * description (the prompt for the agent, e.g., "Add a new endpoint for /api/users")
   * status (e.g., pending, running, pr\_open, merging, completed, failed)
   * branch\_name (e.g., cursor-agent/task-1-abc123)
-  * pull\_request\_url
+  * pr\_url (shortened from pull\_request\_url for consistency)
   * cursor\_agent\_id (string, the ID from the Cursor API, e.g., "bc\_abc123")
   * debug\_log (text, for storing agent output/errors)
   * position (integer, for sequential ordering)
