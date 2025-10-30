@@ -67,13 +67,12 @@ RSpec.describe "Epics", type: :request do
 
       it "displays helper text for base branch" do
         get new_epic_path
-        expect(response.body).to include("The branch to base tasks on")
+        expect(response.body).to include("The branch to base all task branches on (default: main)")
       end
 
       it "displays helper text for tasks format" do
         get new_epic_path
-        expect(response.body).to include('Enter one task per line')
-        expect(response.body).to include('Format: "Task N: Description"')
+        expect(response.body).to include('Enter one task per line starting with \"Task N: Description\"')
       end
     end
 
@@ -149,7 +148,7 @@ RSpec.describe "Epics", type: :request do
 
       it "displays task count" do
         get epic_path(epic)
-        expect(response.body).to include("(3)")
+        expect(response.body).to include("Tasks (3)")
       end
 
       it "displays all tasks in order" do
@@ -186,7 +185,7 @@ RSpec.describe "Epics", type: :request do
 
       it "displays back button" do
         get epic_path(epic)
-        expect(response.body).to include("Back to New Epic")
+        expect(response.body).to include("Create New Epic")
       end
 
       it "displays refresh button" do
