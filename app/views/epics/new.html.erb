@@ -18,8 +18,8 @@
       </div>
 
       <div>
-        <%= form.label :tasks, "Tasks", class: "block text-sm font-medium text-gray-700 mb-2" %>
-        <%= form.text_area :tasks, rows: 10, 
+        <%= form.label :tasks_input, "Tasks", class: "block text-sm font-medium text-gray-700 mb-2" %>
+        <%= text_area_tag :tasks_input, nil, rows: 10, 
             placeholder: "Task 1: Add user authentication\nTask 2: Create dashboard\nTask 3: Deploy to production",
             class: "block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono" %>
         <p class="mt-1 text-sm text-gray-500">Enter one task per line. Format: "Task N: Description"</p>

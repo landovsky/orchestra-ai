@@ -10,7 +10,7 @@ class EpicsController < ApplicationController
     # Parse tasks from textarea (one per line)
     tasks_text = params[:epic][:tasks] || ""
     tasks_array = tasks_text.split("\n").map(&:strip).reject(&:empty?)
-    
+
     # Call the interaction
     outcome = Epics::CreateFromManualSpec.run(
       user: current_user,
@@ -31,6 +31,6 @@ class EpicsController < ApplicationController
   end
 
   def show
-    @epic = Epic.find(params[:id])
+    @epic = current_user.epics.includes(tasks: []).find(params[:id])
   end
 end
