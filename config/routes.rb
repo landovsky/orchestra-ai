@@ -17,5 +17,5 @@ Rails.application.routes.draw do
   resources :epics, only: [:new, :create, :show]
 
   # Defines the root path route ("/")
-  # root "posts#index"
+  root "epics#new"
 end
