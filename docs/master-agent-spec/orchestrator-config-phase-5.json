@@ -1,0 +1,18 @@
+{
+  "repository": "git@github.com:landovsky/orchestra-ai.git",
+  "ref": "epic/task-execution-engine",
+  "iterations": [
+    {
+      "text": "Replace all instances of 'object' in active interactions (eg object :repository, class: Repository) with 'record :repository'- use class only if class name is different from the record name"
+    },
+    {
+      "text": "Task 5.1: Tasks::ExecuteJob (Basic) - Create job that launches Cursor agent. Test from console to verify agent launches, saves agent ID and branch name. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 5.2: Webhook Controller (Minimal) - Create controller to receive Cursor callbacks. Setup ngrok and test webhook receives RUNNING, FINISHED, or ERROR status. Reference: @implementation-tasks.md"
+    },
+    {
+      "text": "Task 5.3: Webhook FINISHED Handler - Implement handler for successful completion. Test task transitions to pr_open and saves PR URL. Reference: @implementation-tasks.md"
+    }
+  ]
+}

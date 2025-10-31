@@ -8,7 +8,7 @@ AI coding assistants (like Cursor) are powerful but create a frustrating workflo
 2. **Poor Quality on Large Tasks:** To avoid the constant waiting, developers are tempted to give the AI large, complex tasks. The AI agents aren't good at this; they "create a mess" and produce low-quality code.
 3. **Low AI Utilization:** Because the tool requires constant supervision, developers treat it as an "attended tool." This limits its use to maybe an hour a day, leaving a powerful resource sitting idle.
 
-### **Solution**
+### **Our Solution**
 
 Orchestra.ai transforms AI assistants from an **attended tool** into an **unattended workhorse**.
 
