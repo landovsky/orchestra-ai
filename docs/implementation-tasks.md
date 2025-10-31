@@ -285,17 +285,6 @@
 - **Pages:** `/credentials`, `/repositories`
 - **AC:** User can manage API keys and repos
 
----
-
-## Testing Philosophy by Phase
-
-| Phase | Testing Approach |
-|-------|-----------------|
-| 3 | Console scripts, real APIs with test accounts |
-| 4-5 | Console + RSpec (interactions, jobs) |
-| 6-7 | Feature specs with manual verification |
-| 8-9 | Feature specs with system tests (ActionCable) |
-
 ## Key Incremental Checkpoints
 
 After each phase, you should be able to:
