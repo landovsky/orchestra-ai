@@ -14,7 +14,7 @@ gem 'devise'
 gem 'bootsnap', require: false
 gem 'puma', '~> 6.0'
 gem 'rails', '~> 8.1'
-gem 'route_translator', '~> 14.1', '>= 14.1.1'
+# gem 'route_translator', '~> 14.1', '>= 14.1.1' # TODO: Temporarily disabled due to Rails 8.1 incompatibility
 
 ## Front-end and Asset Pipeline
 gem 'avo'
@@ -78,6 +78,7 @@ gem 'googleauth'
 # gem 'google-cloud-vision'
 gem 'httparty'
 gem 'mailjet'
+gem 'octokit', '~> 9.0'
 gem 'posthog-ruby'
 gem 'ruby-openai', '~> 7', '>= 7.3'
 
@@ -91,6 +92,7 @@ group :development, :test do
   gem 'ffaker'
   gem 'pry-rails'
   gem 'rspec-rails'
+  gem 'shoulda-matchers', '~> 6.0'
   # gem 'rswag-specs'
 end
 

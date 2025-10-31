@@ -1,0 +1,95 @@
+<div class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <header class="bg-white shadow-sm" <%= test_id("epic-new-header").to_h %>>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <h1 class="text-2xl font-bold text-gray-900">Create New Epic</h1>
+      <p class="mt-1 text-sm text-gray-600">Break down your project into manageable tasks</p>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200">
+      <div class="p-6">
+        <%= form_with(model: @epic, local: true, class: "space-y-6", data: { test: "epic-form" }) do |form| %>
+          
+          <!-- Repository Selection -->
+          <div>
+            <%= form.label :repository_id, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
+              Repository <span class="text-red-500">*</span>
+            <% end %>
+            <%= form.collection_select :repository_id, @repositories, :id, :name, 
+                { prompt: "Select a repository" }, 
+                { class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
+                  data: { test: "repository-select" } } %>
+            <p class="mt-2 text-xs text-gray-500">Choose the repository where tasks will be executed</p>
+          </div>
+
+          <!-- Base Branch -->
+          <div>
+            <%= form.label :base_branch, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
+              Base Branch
+            <% end %>
+            <%= form.text_field :base_branch, value: "main", 
+                placeholder: "main",
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
+                data: { test: "base-branch-input" } %>
+            <p class="mt-2 text-xs text-gray-500">The branch to base all task branches on (default: main)</p>
+          </div>
+
+          <!-- Tasks Input -->
+          <div>
+            <%= form.label :tasks_input, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
+              Tasks <span class="text-red-500">*</span>
+            <% end %>
+            <%= text_area_tag :tasks_input, nil, rows: 12, 
+                placeholder: "Task 1: Add user authentication system\nTask 2: Create responsive dashboard\nTask 3: Implement notification system\nTask 4: Deploy to production",
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-mono transition duration-150 ease-in-out",
+                data: { test: "tasks-input" } %>
+            
+            <div class="mt-2 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <p class="text-xs text-blue-700">
+                    <strong>Format:</strong> Enter one task per line starting with "Task N: Description"
+                  </p>
+                  <p class="text-xs text-blue-700 mt-1">
+                    Each task will be executed sequentially in order.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div class="flex gap-3">
+              <%= form.submit "Create Epic", 
+                  class: "inline-flex items-center justify-center rounded-lg border border-transparent bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out",
+                  data: { test: "submit-button" } %>
+              <%= link_to "Cancel", root_path, 
+                  class: "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out",
+                  data: { test: "cancel-button" } %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="mt-6 bg-gray-50 rounded-lg border border-gray-200 p-4">
+      <h3 class="text-sm font-semibold text-gray-900 mb-2">💡 Tips for Success</h3>
+      <ul class="text-xs text-gray-600 space-y-1 list-disc list-inside">
+        <li>Write clear, concise task descriptions</li>
+        <li>Order tasks by dependency (earlier tasks should complete before later ones depend on them)</li>
+        <li>Each task will create a separate branch and pull request</li>
+        <li>Tasks are executed automatically by AI agents</li>
+      </ul>
+    </div>
+  </main>
+</div>

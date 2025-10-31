@@ -1,6 +1,10 @@
 # Implementation Plan: AI Agent Orchestrator
 
----
+## Common criteria
+- write RSpec tests for each service and model
+- write RSpec feature smoke tests for each page (the page loads, has expected text, shows data, etc.)
+- if you must deviate from the specification, update the spec-orchestrator.md document (include justification for the deviation)
+
 
 ## ✅ Completed - Phase 3: Console-First Integration Testing
 
