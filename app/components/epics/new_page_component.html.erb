@@ -39,10 +39,10 @@
 
           <!-- Tasks Input -->
           <div>
-            <%= form.label :tasks_input, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
+            <%= form.label :tasks, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
               Tasks <span class="text-red-500">*</span>
             <% end %>
-            <%= text_area_tag :tasks_input, nil, rows: 12, 
+            <%= form.text_area :tasks, rows: 12,
                 placeholder: "Task 1: Add user authentication system\nTask 2: Create responsive dashboard\nTask 3: Implement notification system\nTask 4: Deploy to production",
                 class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-mono transition duration-150 ease-in-out",
                 data: { test: "tasks-input" } %>

@@ -83,6 +83,14 @@ module Services
         source: {
           repository: task.epic.repository.github_url,
           ref: task.epic.base_branch
+        },
+        target: {
+          branchName: branch_name,
+          autoCreatePr: true
+        },
+        webhook: {
+          url: webhook_url,
+          secret: WEBHOOK_SECRET
         }
       }
     end

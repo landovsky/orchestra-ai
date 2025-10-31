@@ -63,7 +63,7 @@
     <div class="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Progress Overview</h2>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <% task_counts = @epic.tasks.group(:status).count %>
+        <% task_counts = @epic.tasks.reorder(nil).group(:status).count %>
         <% ['pending', 'running', 'pr_open', 'merging', 'completed', 'failed'].each do |status| %>
           <div class="text-center p-3 rounded-lg border <%= task_status_badge_class(status) %>" data-test="status-count-<%= status %>">
             <div class="text-2xl font-bold"><%= task_counts[status] || 0 %></div>
