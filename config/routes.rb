@@ -14,8 +14,12 @@ Rails.application.routes.draw do
   post 'webhooks/cursor/:task_id', to: 'webhooks#cursor', as: :cursor_webhook
 
   # Epic management
-  resources :epics, only: [:new, :create, :show]
+  resources :epics, only: [:index, :new, :create, :show] do
+    member do
+      post :dispatch_agent
+    end
+  end
 
   # Defines the root path route ("/")
-  root "epics#new"
+  root "epics#index"
 end

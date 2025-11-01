@@ -80,6 +80,8 @@
 
           <!-- Navigation Links -->
           <div class="flex items-center gap-4">
+            <%= link_to "All Epics", epics_path, 
+                class: "text-sm font-medium text-gray-700 hover:text-indigo-600 transition duration-150" %>
             <%= link_to "New Epic", new_epic_path, 
                 class: "inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition duration-150",
                 data: { test: "nav-new-epic" } %>
