@@ -12,7 +12,7 @@ gem 'devise'
 
 ## Rails
 gem 'bootsnap', require: false
-gem 'puma', '~> 6.0'
+gem 'puma', '~> 7.1'
 gem 'rails', '~> 8.1'
 # gem 'route_translator', '~> 14.1', '>= 14.1.1' # TODO: Temporarily disabled due to Rails 8.1 incompatibility
 
