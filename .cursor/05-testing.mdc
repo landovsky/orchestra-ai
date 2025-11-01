@@ -1,0 +1,7 @@
+---
+description: Testing instructions
+alwaysApply: true
+---
+
+- write RSpec tests for each service and model
+- write RSpec feature smoke tests for each page (the page loads, has expected text, shows data, etc.)

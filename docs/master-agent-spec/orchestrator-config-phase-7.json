@@ -1,0 +1,18 @@
+{
+  "repository": "git@github.com:landovsky/orchestra-ai.git",
+  "ref": "epic/layout-and-webhook-refactor",
+  "iterations": [
+    {
+      "text": "Task 7.1: BaseLayout + Authenticated Layout - Create shared base layout with html/head/body primitives, move navbar into authenticated layout/controller, and ensure flashes render correctly for both contexts. Reference: @docs/implementation-tasks-vol3.md"
+    },
+    {
+      "text": "Task 7.2: Devise SessionsController Override - Subclass Devise sessions controller to use the base layout for unauthenticated views and confirm sign-in/out flows render without authenticated chrome. Reference: @docs/implementation-tasks-vol3.md"
+    },
+    {
+      "text": "Task 7.3: Webhooks ApplicationInteractions - Extract webhook business logic into dedicated ApplicationInteraction objects and wire controller to delegate to them with specs covering success/failure paths. Reference: @docs/implementation-tasks-vol3.md"
+    },
+    {
+      "text": "Task 7.4: Finished Status Merge Job - Enqueue async job wrapping an ApplicationInteraction to merge finished feature branches into the base branch and surface merge errors appropriately. Reference: @docs/implementation-tasks-vol3.md"
+    }
+  ]
+}

@@ -5,3 +5,4 @@ alwaysApply: true
 
 Stack: Rails, ViewComponent (erb), Tailwind, Stimulus JS, Sidekiq (Redis), Postgresql
 Docs: Any documentation except main README.md belongs to docs/
+- if you must deviate from the specification, update the architecture-decisions.md document (include task number and name and justification for the deviation)
