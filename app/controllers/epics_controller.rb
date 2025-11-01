@@ -1,5 +1,4 @@
-class EpicsController < ApplicationController
-  before_action :authenticate_user!
+class EpicsController < AuthenticatedController
 
   def new
     @epic = Epic.new
