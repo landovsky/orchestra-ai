@@ -279,10 +279,123 @@ RSpec.describe "Epics", type: :request do
 
   describe "GET /" do
     context "root path routing" do
-      it "renders the new epic page" do
+      it "renders the epics index page" do
         get root_path
         expect(response).to have_http_status(:success)
+        expect(response.body).to include("All Epics")
+      end
+    end
+  end
+
+  describe "GET /epics" do
+    let!(:epic1) { create(:epic, user: user, repository: repository, title: "First Epic") }
+    let!(:epic2) { create(:epic, user: user, repository: repository, title: "Second Epic") }
+
+    context "smoke tests - page loads and displays expected content" do
+      it "successfully loads the epics index page" do
+        get epics_path
+        expect(response).to have_http_status(:success)
+      end
+
+      it "displays the page title" do
+        get epics_path
+        expect(response.body).to include("All Epics")
+      end
+
+      it "displays all user's epics" do
+        get epics_path
+        expect(response.body).to include("First Epic")
+        expect(response.body).to include("Second Epic")
+      end
+
+      it "displays epic repository names" do
+        get epics_path
+        expect(response.body).to include(repository.name)
+      end
+
+      it "displays epic statuses" do
+        epic1.update!(status: :running)
+        get epics_path
+        expect(response.body).to include("Running")
+      end
+
+      it "displays create new epic button" do
+        get epics_path
         expect(response.body).to include("Create New Epic")
+      end
+    end
+
+    context "when user has no epics" do
+      before do
+        epic1.destroy
+        epic2.destroy
+      end
+
+      it "successfully loads but shows empty state" do
+        get epics_path
+        
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include("No epics yet")
+      end
+    end
+
+    context "when user is not authenticated" do
+      before do
+        sign_out user
+      end
+
+      it "redirects to sign in page" do
+        get epics_path
+        expect(response).to redirect_to(new_user_session_path)
+      end
+    end
+  end
+
+  describe "POST /epics/:id/dispatch_agent" do
+    let(:cursor_credential) { create(:credential, user: user, service_name: 'cursor_agent') }
+    let(:epic) { create(:epic, user: user, repository: repository, cursor_agent_credential: cursor_credential) }
+    let!(:pending_task) { create(:task, epic: epic, status: 'pending', position: 1) }
+
+    before do
+      allow(Tasks::Services::Execute).to receive(:run!).and_return({ task: pending_task, agent_id: 'test-id', branch_name: 'test-branch' })
+    end
+
+    context "when user is authenticated and owns the epic" do
+      it "successfully dispatches the agent" do
+        post dispatch_agent_epic_path(epic)
+        
+        expect(response).to redirect_to(epic_path(epic))
+        expect(flash[:notice]).to match(/Agent dispatched successfully/)
+      end
+
+      it "calls the execute service with the correct task" do
+        post dispatch_agent_epic_path(epic)
+        
+        expect(Tasks::Services::Execute).to have_received(:run!).with(task: pending_task)
+      end
+    end
+
+    context "when there are no pending tasks" do
+      before do
+        pending_task.update!(status: 'completed')
+      end
+
+      it "redirects with an alert message" do
+        post dispatch_agent_epic_path(epic)
+        
+        expect(response).to redirect_to(epic_path(epic))
+        expect(flash[:alert]).to match(/No pending tasks available/)
+      end
+    end
+
+    context "when user is not authenticated" do
+      before do
+        sign_out user
+      end
+
+      it "redirects to sign in page" do
+        post dispatch_agent_epic_path(epic)
+        expect(response).to redirect_to(new_user_session_path)
       end
     end
   end
