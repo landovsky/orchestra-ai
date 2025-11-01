@@ -325,7 +325,7 @@ GEM
     prettyprint (0.2.0)
     prop_initializer (0.2.0)
       zeitwerk (>= 2.6.18)
-    prosopite (1.4.2)
+    prosopite (2.1.2)
     pry (0.15.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -554,7 +554,7 @@ DEPENDENCIES
   oj
   pg (~> 1.1)
   posthog-ruby
-  prosopite (~> 1.4)
+  prosopite (~> 2.1)
   pry-rails
   puma (~> 6.0)
   rack-cors
