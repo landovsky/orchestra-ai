@@ -47,10 +47,10 @@ class EpicsController < ApplicationController
 
   def dispatch_agent
     @epic = current_user.epics.find(params[:id])
-    
+
     # Find the first pending task
     task = @epic.tasks.pending.ordered.first
-    
+
     if task.nil?
       redirect_to epic_path(@epic), alert: "No pending tasks available to dispatch."
       return
@@ -58,7 +58,7 @@ class EpicsController < ApplicationController
 
     # Execute the task synchronously
     begin
-      Tasks::Services::Execute.run!(task: task)
+      ::Tasks::Services::Execute.run!(task: task)
       redirect_to epic_path(@epic), notice: "Agent dispatched successfully for task ##{task.position}!"
     rescue StandardError => e
       redirect_to epic_path(@epic), alert: "Failed to dispatch agent: #{e.message}"

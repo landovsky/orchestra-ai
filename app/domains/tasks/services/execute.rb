@@ -119,7 +119,7 @@ module Tasks
       def generate_webhook_url
         # In development/test, you might use ngrok
         # In production, this would be your actual domain
-        base_url = ENV.fetch('APP_URL', 'http://localhost:3000')
+        base_url = ENV.fetch('APP_URL', 'https://intent-gratefully-mammoth.ngrok-free.app')
         "#{base_url}/webhooks/cursor/#{task.id}"
       end
     end

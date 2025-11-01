@@ -9,7 +9,7 @@ module Services
   # This service handles operations like launching agents with specific tasks and configurations.
   class CursorAgentService
     CURSOR_API_ENDPOINT = 'https://api.cursor.com/v0'
-    WEBHOOK_SECRET = ENV.fetch('CURSOR_WEBHOOK_SECRET', 'default-webhook-secret')
+    WEBHOOK_SECRET = ENV.fetch('CURSOR_WEBHOOK_SECRET', 'your-webhook-secret-key-minimum-32-characters')
 
     attr_reader :api_key, :credential
 
