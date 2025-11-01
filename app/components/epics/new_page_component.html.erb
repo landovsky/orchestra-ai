@@ -11,15 +11,15 @@
   <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-white shadow-sm rounded-lg border border-gray-200">
       <div class="p-6">
-        <%= form_with(model: @epic, local: true, class: "space-y-6", data: { test: "epic-form" }) do |form| %>
-          
+        <%= form_with(model: @epic, class: "space-y-6", data: { turbo: false, test: "epic-form" }) do |form| %>
+
           <!-- Repository Selection -->
           <div>
             <%= form.label :repository_id, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
               Repository <span class="text-red-500">*</span>
             <% end %>
-            <%= form.collection_select :repository_id, @repositories, :id, :name, 
-                { prompt: "Select a repository" }, 
+            <%= form.collection_select :repository_id, @repositories, :id, :name,
+                { prompt: "Select a repository" },
                 { class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
                   data: { test: "repository-select" } } %>
             <p class="mt-2 text-xs text-gray-500">Choose the repository where tasks will be executed</p>
@@ -30,7 +30,7 @@
             <%= form.label :base_branch, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
               Base Branch
             <% end %>
-            <%= form.text_field :base_branch, value: "main", 
+            <%= form.text_field :base_branch, value: "main",
                 placeholder: "main",
                 class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
                 data: { test: "base-branch-input" } %>
@@ -46,7 +46,7 @@
                 placeholder: "Task 1: Add user authentication system\nTask 2: Create responsive dashboard\nTask 3: Implement notification system\nTask 4: Deploy to production",
                 class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-mono transition duration-150 ease-in-out",
                 data: { test: "tasks-input" } %>
-            
+
             <div class="mt-2 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
               <div class="flex">
                 <div class="flex-shrink-0">
@@ -69,10 +69,10 @@
           <!-- Action Buttons -->
           <div class="flex items-center justify-between pt-4 border-t border-gray-200">
             <div class="flex gap-3">
-              <%= form.submit "Create Epic", 
+              <%= form.submit "Create Epic",
                   class: "inline-flex items-center justify-center rounded-lg border border-transparent bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out",
                   data: { test: "submit-button" } %>
-              <%= link_to "Cancel", root_path, 
+              <%= link_to "Cancel", root_path,
                   class: "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out",
                   data: { test: "cancel-button" } %>
             </div>

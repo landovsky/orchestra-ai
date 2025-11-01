@@ -33,9 +33,10 @@ RSpec.describe EpicsController, type: :controller do
         expect(assigns(:repositories)).not_to include(other_repository)
       end
 
-      it 'renders the new template' do
+      it 'renders successfully' do
         get :new
-        expect(response).to render_template(:new)
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include('Create New Epic')
       end
     end
 
@@ -74,9 +75,10 @@ RSpec.describe EpicsController, type: :controller do
         expect(assigns(:epic).tasks).to match_array([task1, task2])
       end
 
-      it 'renders the show template' do
+      it 'renders successfully' do
         get :show, params: { id: epic.id }
-        expect(response).to render_template(:show)
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(epic.title)
       end
     end
 

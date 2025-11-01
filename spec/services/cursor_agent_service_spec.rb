@@ -108,7 +108,7 @@ RSpec.describe Services::CursorAgentService do
           }
         }
 
-        expect(service).to receive(:post_to_cursor_api).with(expected_payload).and_return(mock_response)
+        expect(service).to receive(:post_to_cursor_api).with(expected_payload, '/agents').and_return(mock_response)
 
         service.launch_agent(task: task, webhook_url: webhook_url, branch_name: branch_name)
       end

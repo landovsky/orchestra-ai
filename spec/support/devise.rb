@@ -24,6 +24,8 @@ module ControllerSpecHelper
   end
 
   def sign_out(user)
+    # Clear the warden user
+    @request.env['warden'].logout if @request && @request.env['warden']
     Warden.test_reset!
   end
 
@@ -37,6 +39,9 @@ RSpec.configure do |config|
   config.include RequestSpecHelper, type: :request
   config.include Devise::Test::ControllerHelpers, type: :controller
   config.include ControllerSpecHelper, type: :controller
+  config.include Rails::Controller::Testing::TestProcess, type: :controller
+  config.include Rails::Controller::Testing::TemplateAssertions, type: :controller
+  config.include Rails::Controller::Testing::Integration, type: :controller
 
   config.after(:each, type: :controller) do
     Warden.test_reset!
