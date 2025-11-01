@@ -12,6 +12,16 @@
     <div class="bg-white shadow-sm rounded-lg border border-gray-200">
       <div class="p-6">
         <%= form_with(model: @epic, class: "space-y-6", data: { turbo: false, test: "epic-form" }) do |form| %>
+          <!-- Title Input -->
+          <div>
+            <%= form.label :title, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
+              Title <span class="text-red-500">*</span>
+            <% end %>
+            <%= form.text_field :title, required: true, placeholder: "Enter a title for the epic",
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
+                data: { test: "title-input" } %>
+          </div>
+
 
           <!-- Repository Selection -->
           <div>
@@ -19,7 +29,7 @@
               Repository <span class="text-red-500">*</span>
             <% end %>
             <%= form.collection_select :repository_id, @repositories, :id, :name,
-                { prompt: "Select a repository" },
+                { prompt: "Select a repository", required: true },
                 { class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm transition duration-150 ease-in-out",
                   data: { test: "repository-select" } } %>
             <p class="mt-2 text-xs text-gray-500">Choose the repository where tasks will be executed</p>
@@ -42,7 +52,8 @@
             <%= form.label :tasks, class: "block text-sm font-semibold text-gray-900 mb-2" do %>
               Tasks <span class="text-red-500">*</span>
             <% end %>
-            <%= form.text_area :tasks, rows: 12,
+            <%= form.text_area :tasks, required: true, rows: 12,
+                value: tasks_input,
                 placeholder: "Task 1: Add user authentication system\nTask 2: Create responsive dashboard\nTask 3: Implement notification system\nTask 4: Deploy to production",
                 class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-mono transition duration-150 ease-in-out",
                 data: { test: "tasks-input" } %>

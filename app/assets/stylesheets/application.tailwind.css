@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+
+textarea, select, input {
+  padding: 12px !important;
+}

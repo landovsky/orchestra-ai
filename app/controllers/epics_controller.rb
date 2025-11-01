@@ -27,7 +27,11 @@ class EpicsController < ApplicationController
       @epic = Epic.new
       @repositories = current_user.repositories
       flash.now[:alert] = outcome.errors.full_messages.join(", ")
-      render Epics::NewPageComponent.new(epic: @epic, repositories: @repositories), status: :unprocessable_entity
+      render Epics::NewPageComponent.new(
+        epic: @epic,
+        repositories: @repositories,
+        tasks_input: tasks_text
+      ), status: :unprocessable_entity
     end
   end
 
